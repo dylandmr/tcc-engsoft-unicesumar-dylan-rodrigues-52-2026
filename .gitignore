@@ -1,0 +1,8 @@
+# Claude Code / agent local artifacts (may contain credentials or machine-local state)
+.claude/.credentials.json
+.claude/settings.local.json
+.claude/projects/
+.claude/shell-snapshots/
+.claude/todos/
+.claude/statsig/
+.claude/memory/
