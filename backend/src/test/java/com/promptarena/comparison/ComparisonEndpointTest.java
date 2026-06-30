@@ -18,8 +18,8 @@ import com.promptarena.repository.UserRepository;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -56,8 +56,7 @@ class ComparisonEndpointTest {
   void createPersistsPendingAndIsListedAndDetailed() throws Exception {
     String response =
         mockMvc
-            .perform(
-                authedPost(requestBody("Explain entanglement", "[\"CLAUDE\",\"CHATGPT\"]")))
+            .perform(authedPost(requestBody("Explain entanglement", "[\"CLAUDE\",\"CHATGPT\"]")))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.comparisonId").exists())
             .andExpect(jsonPath("$.providers[0]").value("CLAUDE"))

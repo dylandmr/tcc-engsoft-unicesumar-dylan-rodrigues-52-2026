@@ -12,14 +12,21 @@ async function reachComposer() {
 describe('ComposerPage', () => {
   it('blocks an empty prompt with a validation message', async () => {
     await reachComposer()
-    await userEvent.click(screen.getByRole('button', { name: /Run comparison/ }))
+    await userEvent.click(
+      screen.getByRole('button', { name: /Run comparison/ }),
+    )
     expect(await screen.findByRole('alert')).toHaveTextContent(/Enter a prompt/)
   })
 
   it('blocks running with no providers selected', async () => {
     await reachComposer()
-    await userEvent.type(screen.getByLabelText('Prompt'), 'Why is the sky blue?')
-    await userEvent.click(screen.getByRole('button', { name: /Run comparison/ }))
+    await userEvent.type(
+      screen.getByLabelText('Prompt'),
+      'Why is the sky blue?',
+    )
+    await userEvent.click(
+      screen.getByRole('button', { name: /Run comparison/ }),
+    )
     expect(await screen.findByRole('alert')).toHaveTextContent(
       /at least one model/,
     )
@@ -45,9 +52,14 @@ describe('ComposerPage', () => {
 
   it('runs a comparison and opens the results arena', async () => {
     await reachComposer()
-    await userEvent.type(screen.getByLabelText('Prompt'), 'Explain entanglement')
+    await userEvent.type(
+      screen.getByLabelText('Prompt'),
+      'Explain entanglement',
+    )
     await userEvent.click(screen.getByRole('checkbox', { name: 'Claude' }))
-    await userEvent.click(screen.getByRole('button', { name: /Run comparison/ }))
+    await userEvent.click(
+      screen.getByRole('button', { name: /Run comparison/ }),
+    )
     await waitFor(() =>
       expect(
         screen.getByRole('region', { name: 'Claude' }),
@@ -62,9 +74,14 @@ describe('ComposerPage', () => {
       ),
     )
     await reachComposer()
-    await userEvent.type(screen.getByLabelText('Prompt'), 'Explain entanglement')
+    await userEvent.type(
+      screen.getByLabelText('Prompt'),
+      'Explain entanglement',
+    )
     await userEvent.click(screen.getByRole('checkbox', { name: 'Claude' }))
-    await userEvent.click(screen.getByRole('button', { name: /Run comparison/ }))
+    await userEvent.click(
+      screen.getByRole('button', { name: /Run comparison/ }),
+    )
     expect(await screen.findByRole('alert')).toHaveTextContent(
       /Could not start the comparison/,
     )

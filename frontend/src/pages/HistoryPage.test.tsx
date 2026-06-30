@@ -7,9 +7,7 @@ import { renderApp } from '../../testing/render'
 describe('HistoryPage', () => {
   it('shows an empty state when there are no comparisons', async () => {
     renderApp({ route: '/history' })
-    expect(
-      await screen.findByText(/No comparisons yet/),
-    ).toBeInTheDocument()
+    expect(await screen.findByText(/No comparisons yet/)).toBeInTheDocument()
   })
 
   it('shows an error state when history fails to load', async () => {
@@ -44,7 +42,9 @@ describe('HistoryPage', () => {
     expect(screen.getByText('2 min ago')).toBeInTheDocument()
     await userEvent.click(row)
     await waitFor(() =>
-      expect(screen.getByRole('region', { name: 'Claude' })).toBeInTheDocument(),
+      expect(
+        screen.getByRole('region', { name: 'Claude' }),
+      ).toBeInTheDocument(),
     )
   })
 

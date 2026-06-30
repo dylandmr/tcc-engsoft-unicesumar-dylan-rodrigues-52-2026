@@ -189,8 +189,7 @@ class ComparisonServiceTest {
   void replayEmitsPersistedResults() {
     User user = new User("alice", "hash");
     Comparison comparison = new Comparison(user, "prompt", List.of(Provider.CLAUDE));
-    comparison.addResult(
-        new ProviderResult(Provider.CLAUDE, Outcome.SUCCESS, "answer", null, 12L));
+    comparison.addResult(new ProviderResult(Provider.CLAUDE, Outcome.SUCCESS, "answer", null, 12L));
     comparison.addResult(
         new ProviderResult(Provider.GEMINI, Outcome.ERROR, null, "rate_limited", null));
     when(comparisons.findById("c1")).thenReturn(Optional.of(comparison));
@@ -199,7 +198,8 @@ class ComparisonServiceTest {
     int replayed = service(45_000).replay("c1", events::add);
 
     assertThat(replayed).isEqualTo(2);
-    assertThat(events).extracting(ResultEvent::provider)
+    assertThat(events)
+        .extracting(ResultEvent::provider)
         .containsExactly(Provider.CLAUDE, Provider.GEMINI);
   }
 

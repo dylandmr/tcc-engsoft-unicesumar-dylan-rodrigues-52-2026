@@ -64,7 +64,9 @@ export function HistoryPage() {
       </TopBar>
 
       <main className="mx-auto max-w-4xl px-6">
-        <p className="font-mono text-xs tracking-wider text-ignition">HISTORY</p>
+        <p className="font-mono text-xs tracking-wider text-ignition">
+          HISTORY
+        </p>
         <h1 className="mt-2 mb-8 font-display text-4xl font-medium text-bright">
           Past comparisons
         </h1>

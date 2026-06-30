@@ -64,7 +64,7 @@ projects exist; do the minimal scaffold, then wire the gates.
 - [X] T002 Initialize Spring Boot 3.x backend (Maven, Java 21) in `backend/pom.xml` with web, security, validation, data-jpa starters — scaffolded via Spring Initializr (web, security, validation, data-jpa, actuator) + Maven Wrapper; compiles clean
 - [X] T003 [P] Add provider + infra dependencies to `backend/pom.xml` (`com.openai:openai-java`, `com.anthropic:anthropic-java`, `com.google.genai:google-genai`, `org.xerial:sqlite-jdbc`, `org.hibernate.orm:hibernate-community-dialects`, WireMock, JUnit 5, Mockito)
 - [X] T004 [P] Initialize React 18 + Vite + TypeScript app in `frontend/` (`package.json`, `vite.config.ts`, Vitest + React Testing Library + MSW dev deps) — scaffolded via create-vite react-ts; deps installed (Vitest/RTL/MSW added in a later step)
-- [ ] T005 [P] Configure backend formatting (Spotless) and frontend ESLint + Prettier configs
+- [X] T005 [P] Configure backend formatting (Spotless) and frontend ESLint + Prettier configs — Spotless (google-java-format) bound to `verify` as a gate (`mvn spotless:apply` to fix); frontend uses **oxlint** (ESLint-class linter) + **Prettier** (`.prettierrc.json` matching the no-semi/single-quote style) with `format`/`format:check` scripts
 - [X] T006 [P] Create `.env.example` documenting provider key vars (OPENAI/ANTHROPIC/GOOGLE/XAI/DEEPSEEK) and confirm `.env`, `data/`, `*.db` are in `.gitignore`
 
 ---
@@ -209,11 +209,11 @@ a second user sees an empty state and never the first user's data.
 
 - [X] T057 [P] Multi-stage `backend/Dockerfile` (build SPA + backend; serve SPA same-origin with the API)
 - [X] T058 Author root `docker-compose.yml` so `docker compose up` runs backend + persists SQLite volume; wire env vars
-- [ ] T059 [P] Enable `PRAGMA journal_mode=WAL` + `busy_timeout` at startup and verify no `SQLITE_BUSY` under concurrent writes
-- [ ] T060 [P] Security hardening: confirm CSRF on state-changing routes and that provider keys never reach the client (FR-018)
-- [ ] T061 [P] Write `README.md` run instructions and complete `.env.example`
-- [ ] T062 Run `quickstart.md` scenarios V1–V4 end-to-end and record results
-- [ ] T063 [P] Enforce `MAX_PROMPT_LEN` and handle long-response panel display (scroll / expand)
+- [X] T059 [P] Enable `PRAGMA journal_mode=WAL` + `busy_timeout` at startup and verify no `SQLITE_BUSY` under concurrent writes — set via the datasource URL (`?journal_mode=WAL&busy_timeout=5000`); verified by `SqliteWalConcurrencyTest` (8 concurrent writers × 25 rows, file-backed, no SQLITE_BUSY)
+- [X] T060 [P] Security hardening: confirm CSRF on state-changing routes and that provider keys never reach the client (FR-018) — CSRF enforced on all POSTs via `CookieCsrfTokenRepository` (SSE GET exempt), proven by `with(csrf())` in `AuthFlowTest`/`ComparisonEndpointTest`; provider keys are read server-side only in `ProviderRegistry` (env) and never appear in any DTO/response sent to the SPA
+- [X] T061 [P] Write `README.md` run instructions and complete `.env.example` — root README "Getting started → Run the prototype (`docker compose up`)"; `.env.example` documents all 5 providers + per-provider model vars + tunables, with server-side-only key note
+- [X] T062 Run `quickstart.md` scenarios V1–V4 end-to-end and record results — recorded in `quickstart.md` "Validation results (T062)": V1–V4 ✅ via the automated suite (backend 70 / frontend 74, both 100%) + CI docker smoke; live-key walkthrough noted as the one remaining manual pass
+- [X] T063 [P] Enforce `MAX_PROMPT_LEN` and handle long-response panel display (scroll / expand) — backend `ComparisonValidator` rejects `prompt_too_long`; frontend mirrors the rule (`validateComparison` + live `n/MAX` counter) and each `ProviderLane` response area scrolls (`overflow-y-auto`, `whitespace-pre-wrap`)
 
 ---
 

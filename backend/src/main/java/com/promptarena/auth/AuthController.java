@@ -18,11 +18,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Session login journey for US3 (replaces the US1/US2 HTTP-Basic stopgap). Credentials are checked by
- * the {@link AuthenticationManager}; on success the authentication is persisted into the HTTP session
- * via the {@link SecurityContextRepository} so subsequent requests carry it by cookie. Bad credentials
- * raise an {@code AuthenticationException}, which {@code GlobalExceptionHandler} renders as a
- * non-revealing {@code 401 invalid_credentials}.
+ * Session login journey for US3 (replaces the US1/US2 HTTP-Basic stopgap). Credentials are checked
+ * by the {@link AuthenticationManager}; on success the authentication is persisted into the HTTP
+ * session via the {@link SecurityContextRepository} so subsequent requests carry it by cookie. Bad
+ * credentials raise an {@code AuthenticationException}, which {@code GlobalExceptionHandler}
+ * renders as a non-revealing {@code 401 invalid_credentials}.
  */
 @RestController
 @RequestMapping("/api/auth")

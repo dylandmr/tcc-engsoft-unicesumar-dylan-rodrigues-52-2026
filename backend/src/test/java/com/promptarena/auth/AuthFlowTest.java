@@ -18,8 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * US3 (T044): the session login journey against the seeded demo user. Invalid credentials produce a
- * non-revealing {@code 401 invalid_credentials}; a valid login establishes a session that authorizes
- * {@code /api/auth/me}; logout tears the session down.
+ * non-revealing {@code 401 invalid_credentials}; a valid login establishes a session that
+ * authorizes {@code /api/auth/me}; logout tears the session down.
  */
 @SpringBootTest
 @AutoConfigureMockMvc

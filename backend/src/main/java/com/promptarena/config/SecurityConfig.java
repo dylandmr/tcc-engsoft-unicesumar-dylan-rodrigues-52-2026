@@ -19,26 +19,27 @@ import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.XorCsrfTokenRequestAttributeHandler;
 
 /**
- * Security wiring for US3 — session-cookie authentication with CSRF protection (replacing the US1/US2
- * HTTP-Basic stopgap). Health and the bundled SPA's static assets are public, and {@code POST
- * /api/auth/login} is reachable so a signed-out user can authenticate; every other route requires a
- * session and is scoped to the current user (FR-001, FR-016).
+ * Security wiring for US3 — session-cookie authentication with CSRF protection (replacing the
+ * US1/US2 HTTP-Basic stopgap). Health and the bundled SPA's static assets are public, and {@code
+ * POST /api/auth/login} is reachable so a signed-out user can authenticate; every other route
+ * requires a session and is scoped to the current user (FR-001, FR-016).
  *
- * <p><strong>CSRF:</strong> tokens are stored in a readable {@code XSRF-TOKEN} cookie via
- * {@link CookieCsrfTokenRepository}; the SPA echoes the value in the {@code X-XSRF-TOKEN} header on
- * state-changing requests. {@link CsrfCookieFilter} forces the (otherwise deferred) token to be written
- * on every response. The SSE {@code GET} stream is naturally exempt because CSRF only guards unsafe
- * methods and {@code EventSource} cannot set headers. Unauthenticated API calls get a JSON
- * {@code 401} from {@link RestAuthenticationEntryPoint} rather than a login redirect.
+ * <p><strong>CSRF:</strong> tokens are stored in a readable {@code XSRF-TOKEN} cookie via {@link
+ * CookieCsrfTokenRepository}; the SPA echoes the value in the {@code X-XSRF-TOKEN} header on
+ * state-changing requests. {@link CsrfCookieFilter} forces the (otherwise deferred) token to be
+ * written on every response. The SSE {@code GET} stream is naturally exempt because CSRF only
+ * guards unsafe methods and {@code EventSource} cannot set headers. Unauthenticated API calls get a
+ * JSON {@code 401} from {@link RestAuthenticationEntryPoint} rather than a login redirect.
  */
 @Configuration
 public class SecurityConfig {
 
   @Bean
-  SecurityFilterChain filterChain(HttpSecurity http, SecurityContextRepository securityContextRepository)
-      throws Exception {
+  SecurityFilterChain filterChain(
+      HttpSecurity http, SecurityContextRepository securityContextRepository) throws Exception {
     CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
-    XorCsrfTokenRequestAttributeHandler csrfRequestHandler = new XorCsrfTokenRequestAttributeHandler();
+    XorCsrfTokenRequestAttributeHandler csrfRequestHandler =
+        new XorCsrfTokenRequestAttributeHandler();
     // Opt out of deferred token loading so CsrfCookieFilter can always render the cookie.
     csrfRequestHandler.setCsrfRequestAttributeName(null);
 

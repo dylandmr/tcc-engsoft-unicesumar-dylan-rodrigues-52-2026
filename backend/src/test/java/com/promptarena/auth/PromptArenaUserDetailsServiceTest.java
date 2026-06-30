@@ -35,8 +35,7 @@ class PromptArenaUserDetailsServiceTest {
   void throwsForUnknownUser() {
     when(users.findByUsernameIgnoreCase("ghost")).thenReturn(Optional.empty());
 
-    assertThatThrownBy(
-            () -> new PromptArenaUserDetailsService(users).loadUserByUsername("ghost"))
+    assertThatThrownBy(() -> new PromptArenaUserDetailsService(users).loadUserByUsername("ghost"))
         .isInstanceOf(UsernameNotFoundException.class);
   }
 }

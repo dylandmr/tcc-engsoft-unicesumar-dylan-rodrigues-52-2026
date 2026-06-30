@@ -55,15 +55,17 @@ describe('streamComparison', () => {
 
   it('skips keep-alive comment blocks that carry no data', async () => {
     server.use(
-      http.get('/api/comparisons/:id/stream', () =>
-        new HttpResponse(
-          ': keep-alive\n\n' +
-            encodeSseEvent({
-              event: 'done',
-              data: { comparisonId: 'c1', completed: 0 },
-            }),
-          { headers: { 'Content-Type': 'text/event-stream' } },
-        ),
+      http.get(
+        '/api/comparisons/:id/stream',
+        () =>
+          new HttpResponse(
+            ': keep-alive\n\n' +
+              encodeSseEvent({
+                event: 'done',
+                data: { comparisonId: 'c1', completed: 0 },
+              }),
+            { headers: { 'Content-Type': 'text/event-stream' } },
+          ),
       ),
     )
     const onDone = vi.fn()
@@ -73,8 +75,9 @@ describe('streamComparison', () => {
 
   it('throws ApiError when the stream is not found', async () => {
     server.use(
-      http.get('/api/comparisons/:id/stream', () =>
-        new Response(null, { status: 404 }),
+      http.get(
+        '/api/comparisons/:id/stream',
+        () => new Response(null, { status: 404 }),
       ),
     )
     await expect(

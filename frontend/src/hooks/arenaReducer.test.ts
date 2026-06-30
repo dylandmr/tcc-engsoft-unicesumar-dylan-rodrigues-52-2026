@@ -53,7 +53,11 @@ describe('arenaReducer', () => {
     const ticked = arenaReducer(start, { type: 'tick', elapsedMs: 300 })
     const s = arenaReducer(ticked, {
       type: 'result',
-      result: result({ outcome: 'TIMEOUT', responseText: null, responseTimeMs: null }),
+      result: result({
+        outcome: 'TIMEOUT',
+        responseText: null,
+        responseTimeMs: null,
+      }),
     })
     expect(s.lanes.CLAUDE.status).toBe('timeout')
     expect(s.lanes.CLAUDE.first).toBe(false)

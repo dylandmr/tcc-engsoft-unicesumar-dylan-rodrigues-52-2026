@@ -17,8 +17,7 @@ export function useArena(
   useEffect(() => {
     const controller = new AbortController()
     const start = Date.now()
-    const tick = () =>
-      dispatch({ type: 'tick', elapsedMs: Date.now() - start })
+    const tick = () => dispatch({ type: 'tick', elapsedMs: Date.now() - start })
     tick()
     const interval = setInterval(tick, 100)
 

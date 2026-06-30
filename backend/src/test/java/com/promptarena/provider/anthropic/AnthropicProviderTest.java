@@ -57,7 +57,8 @@ class AnthropicProviderTest {
 
   @Test
   void successfulResponseConcatenatesTextBlocks() {
-    stubMessage(200, "[{\"type\":\"text\",\"text\":\"Hello \"},{\"type\":\"text\",\"text\":\"world\"}]");
+    stubMessage(
+        200, "[{\"type\":\"text\",\"text\":\"Hello \"},{\"type\":\"text\",\"text\":\"world\"}]");
 
     ProviderResponse response = provider("test-key").complete(new PromptRequest("hi"));
 

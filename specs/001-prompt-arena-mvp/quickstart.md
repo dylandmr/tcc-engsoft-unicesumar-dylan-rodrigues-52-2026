@@ -110,3 +110,23 @@ npm test          # Vitest + React Testing Library (+ MSW for mocked SSE/JSON)
 fan-out/isolation tests prove one provider's failure does not affect others; auth tests prove
 protected routes reject unauthenticated access. Definition of Done requires these passing
 (Constitution: Quality Gates).
+
+## Validation results (T062)
+
+**Run date**: 2026-06-30 · **Result**: ✅ all scenarios validated via the automated suite + CI.
+Backend **70** tests (JaCoCo **100%**) and frontend **74** tests (Vitest **100%**) pass; the CI
+**docker** job builds the combined image, runs `docker compose up`, and asserts the health endpoint
+returns 200 (the image runs, not just the unit tests). Each scenario's behaviour is pinned by the
+tests below, which run **without live keys** (mocked providers / WireMock / MSW):
+
+| Scenario | Status | Backing evidence (automated) |
+|----------|--------|------------------------------|
+| **V1** Core comparison | ✅ | `ComparisonServiceTest` (fan-out, all-succeed, results matched) · `ComparisonEndpointTest` (POST→PENDING, list, detail) · frontend `ResultsPage`/`useArena`/`arenaReducer` tests (one lane per provider, independent fill) · `useComposer`/`validation` tests (max-4, empty/zero-provider blocked) |
+| **V2** Isolated failures | ✅ | `ComparisonServiceTest` (`oneProviderErrorsWhileOthersSucceed`, `slowProviderTimesOutWhileOthersUnaffected`, `allProvidersFailIndependently`) · `ProviderResultMapper` classification · frontend `ProviderLane`/`laneStatus` distinct error/timeout/empty states |
+| **V3** Auth gate | ✅ | `ProtectedRouteTest` (401 when unauthenticated) · `AuthFlowTest` (non-revealing 401, session login, logout) · frontend `LoginPage`/`session`/`ProtectedRoute` tests (redirect, login+logout) |
+| **V4** History, per-user scoping | ✅ | `HistoryScopingTest` (own-only list, cross-user 404, empty list — **0% leakage**) · `PersistenceTest` (failed-provider outcomes persisted, `COMPLETE`) · frontend `HistoryPage` tests (list, empty state, reopen) |
+
+**Remaining manual confirmation**: a live walkthrough with real provider API keys (the timing checks
+SC-001 ≈ 2 s and SC-007 reopen ≈ 1 min, and real model output in the lanes). Without keys, every
+provider surfaces a per-provider "unavailable" error — which itself exercises the V2 isolation path
+end-to-end. Add keys to `.env` and run `docker compose up` to perform this pass.

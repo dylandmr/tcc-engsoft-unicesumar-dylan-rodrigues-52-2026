@@ -29,6 +29,7 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(AuthenticationException.class)
   public ResponseEntity<Map<String, String>> handleAuthentication(AuthenticationException ex) {
     // Same code for bad password and unknown user — never reveal which was wrong (FR-003).
-    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "invalid_credentials"));
+    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+        .body(Map.of("error", "invalid_credentials"));
   }
 }

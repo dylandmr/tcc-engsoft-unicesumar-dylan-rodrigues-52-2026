@@ -1,11 +1,11 @@
 package com.promptarena.comparison;
 
+import com.promptarena.dto.PromptRequest;
 import com.promptarena.dto.ProviderResponse;
 import com.promptarena.dto.ResultEvent;
 import com.promptarena.model.Comparison;
 import com.promptarena.model.Provider;
 import com.promptarena.model.ProviderResult;
-import com.promptarena.dto.PromptRequest;
 import com.promptarena.provider.LlmProvider;
 import com.promptarena.provider.ProviderRegistry;
 import com.promptarena.provider.ProviderResultMapper;
@@ -48,8 +48,8 @@ public class ComparisonService {
 
   /**
    * Run the fan-out for a {@code PENDING} comparison: dispatch every selected provider, emit each
-   * {@link ResultEvent} as it arrives, then persist the results and mark the comparison
-   * {@code COMPLETE}. Returns the number of providers reported.
+   * {@link ResultEvent} as it arrives, then persist the results and mark the comparison {@code
+   * COMPLETE}. Returns the number of providers reported.
    */
   @Transactional
   public int execute(String comparisonId, Consumer<ResultEvent> onResult) {
@@ -72,8 +72,8 @@ public class ComparisonService {
   }
 
   /**
-   * Replay a {@code COMPLETE} comparison's persisted results as {@link ResultEvent}s without calling
-   * any provider again (idempotent stream re-open, e.g. from history).
+   * Replay a {@code COMPLETE} comparison's persisted results as {@link ResultEvent}s without
+   * calling any provider again (idempotent stream re-open, e.g. from history).
    */
   @Transactional(readOnly = true)
   public int replay(String comparisonId, Consumer<ResultEvent> onResult) {

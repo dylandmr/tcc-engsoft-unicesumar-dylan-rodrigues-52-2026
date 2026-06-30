@@ -21,9 +21,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * US4 (T050): history is strictly scoped per user (FR-016) — there must be zero cross-user leakage. A
- * user lists and opens only their own comparisons; another user's comparison is simply "not found",
- * never disclosed.
+ * US4 (T050): history is strictly scoped per user (FR-016) — there must be zero cross-user leakage.
+ * A user lists and opens only their own comparisons; another user's comparison is simply "not
+ * found", never disclosed.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -54,8 +54,7 @@ class HistoryScopingTest {
   void aUserCannotOpenAnotherUsersComparison() throws Exception {
     users.save(new User("alice", "hash"));
     User bob = users.save(new User("bob", "hash"));
-    Comparison bobs =
-        comparisons.save(new Comparison(bob, "bob-secret", List.of(Provider.GEMINI)));
+    Comparison bobs = comparisons.save(new Comparison(bob, "bob-secret", List.of(Provider.GEMINI)));
 
     mockMvc
         .perform(get("/api/comparisons/{id}", bobs.getId()).with(user("alice").roles("USER")))

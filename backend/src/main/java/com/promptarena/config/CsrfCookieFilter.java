@@ -10,8 +10,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
  * Materializes the deferred CSRF token on every request so the {@code XSRF-TOKEN} cookie is always
- * written for the SPA to read (Spring Security's documented single-page-application pattern). The SPA
- * echoes that value back in the {@code X-XSRF-TOKEN} header on state-changing requests.
+ * written for the SPA to read (Spring Security's documented single-page-application pattern). The
+ * SPA echoes that value back in the {@code X-XSRF-TOKEN} header on state-changing requests.
  */
 final class CsrfCookieFilter extends OncePerRequestFilter {
 

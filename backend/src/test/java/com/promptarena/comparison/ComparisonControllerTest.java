@@ -31,7 +31,8 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
  * Unit tests for the SSE-driving paths of the controller, where MockMvc's async machinery is
- * awkward. HTTP wiring (validation, persistence, listing) is covered by {@code ComparisonEndpointTest}.
+ * awkward. HTTP wiring (validation, persistence, listing) is covered by {@code
+ * ComparisonEndpointTest}.
  */
 @ExtendWith(MockitoExtension.class)
 class ComparisonControllerTest {
@@ -113,8 +114,7 @@ class ComparisonControllerTest {
     User user = new User("demo", "h");
     Comparison comparison = new Comparison(user, "p", List.of(Provider.CLAUDE));
     when(currentUser.require()).thenReturn(user);
-    when(comparisons.findByIdAndUser(comparison.getId(), user))
-        .thenReturn(Optional.of(comparison));
+    when(comparisons.findByIdAndUser(comparison.getId(), user)).thenReturn(Optional.of(comparison));
     when(comparisonService.execute(anyString(), any())).thenReturn(0);
 
     SseEmitter emitter = controller().stream(comparison.getId());
@@ -129,7 +129,6 @@ class ComparisonControllerTest {
     when(currentUser.require()).thenReturn(user);
     when(comparisons.findByIdAndUser(anyString(), eq(user))).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> controller().stream("missing"))
-        .isInstanceOf(NotFoundException.class);
+    assertThatThrownBy(() -> controller().stream("missing")).isInstanceOf(NotFoundException.class);
   }
 }

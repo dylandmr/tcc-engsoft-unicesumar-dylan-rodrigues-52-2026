@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import com.promptarena.comparison.ComparisonService;
-import com.promptarena.dto.ProviderResponse;
 import com.promptarena.dto.PromptRequest;
+import com.promptarena.dto.ProviderResponse;
 import com.promptarena.model.Comparison;
 import com.promptarena.model.Outcome;
 import com.promptarena.model.Provider;
@@ -27,9 +27,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * US4 (T051): once the fan-out completes, the comparison is persisted as {@code COMPLETE} including
- * the outcomes of providers that failed — so history faithfully shows what happened to every provider,
- * not just the ones that succeeded (FR-013, FR-014). Drives the real persistence path with a stubbed
- * provider registry (one success, one failure).
+ * the outcomes of providers that failed — so history faithfully shows what happened to every
+ * provider, not just the ones that succeeded (FR-013, FR-014). Drives the real persistence path
+ * with a stubbed provider registry (one success, one failure).
  */
 @SpringBootTest
 @Transactional
@@ -60,10 +60,12 @@ class PersistenceTest {
     User alice = users.save(new User("alice", "hash"));
     Comparison pending =
         comparisons.save(
-            new Comparison(alice, "explain entanglement", List.of(Provider.CLAUDE, Provider.GEMINI)));
+            new Comparison(
+                alice, "explain entanglement", List.of(Provider.CLAUDE, Provider.GEMINI)));
 
     when(registry.get(Provider.CLAUDE))
-        .thenReturn(adapter(Provider.CLAUDE, id -> ProviderResultMapper.success(id, "the answer", 12L)));
+        .thenReturn(
+            adapter(Provider.CLAUDE, id -> ProviderResultMapper.success(id, "the answer", 12L)));
     when(registry.get(Provider.GEMINI))
         .thenReturn(
             adapter(

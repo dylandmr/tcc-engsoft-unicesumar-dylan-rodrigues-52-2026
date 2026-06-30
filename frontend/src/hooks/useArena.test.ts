@@ -35,8 +35,9 @@ describe('useArena', () => {
 
   it('marks live lanes as errored when the stream fails', async () => {
     server.use(
-      http.get('/api/comparisons/:id/stream', () =>
-        new Response(null, { status: 404 }),
+      http.get(
+        '/api/comparisons/:id/stream',
+        () => new Response(null, { status: 404 }),
       ),
     )
     const { result } = renderHook(() => useArena('missing', ['CLAUDE']))

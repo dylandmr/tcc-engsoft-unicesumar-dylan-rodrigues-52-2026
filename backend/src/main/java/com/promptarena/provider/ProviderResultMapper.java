@@ -20,11 +20,7 @@ public final class ProviderResultMapper {
   public static ProviderResponse success(Provider provider, String text, Long responseTimeMs) {
     boolean empty = text == null || text.isBlank();
     return new ProviderResponse(
-        provider,
-        empty ? Outcome.EMPTY : Outcome.SUCCESS,
-        empty ? "" : text,
-        null,
-        responseTimeMs);
+        provider, empty ? Outcome.EMPTY : Outcome.SUCCESS, empty ? "" : text, null, responseTimeMs);
   }
 
   /** A failed call (HTTP error, SDK exception, unconfigured provider). */

@@ -37,8 +37,10 @@ class RepositoryIntegrationTest {
     User bob = users.save(new User("bob", "hash"));
 
     Comparison comparison = new Comparison(alice, "explain entanglement");
-    comparison.addResult(new ProviderResult(Provider.CLAUDE, Outcome.SUCCESS, "answer", null, 1840L));
-    comparison.addResult(new ProviderResult(Provider.GEMINI, Outcome.TIMEOUT, null, "Timed out", null));
+    comparison.addResult(
+        new ProviderResult(Provider.CLAUDE, Outcome.SUCCESS, "answer", null, 1840L));
+    comparison.addResult(
+        new ProviderResult(Provider.GEMINI, Outcome.TIMEOUT, null, "Timed out", null));
     comparison.markComplete();
     Comparison saved = comparisons.save(comparison);
 

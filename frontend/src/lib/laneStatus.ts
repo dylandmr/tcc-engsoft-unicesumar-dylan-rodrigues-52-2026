@@ -7,7 +7,8 @@ export interface LaneStatusInfo {
 
 /** Map a lane to its telemetry status line (label + tone colour). */
 export function laneStatusInfo(lane: LaneState): LaneStatusInfo {
-  if (lane.first) return { label: 'first to respond', toneClass: 'text-ignition' }
+  if (lane.first)
+    return { label: 'first to respond', toneClass: 'text-ignition' }
   switch (lane.status) {
     case 'live':
       return { label: 'live · streaming', toneClass: 'text-ignition' }

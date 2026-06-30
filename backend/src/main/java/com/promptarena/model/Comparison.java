@@ -42,9 +42,7 @@ public class Comparison {
    * truth for "which providers" the lazy fan-out should dispatch to when the stream is opened.
    */
   @ElementCollection(fetch = FetchType.EAGER)
-  @CollectionTable(
-      name = "comparison_providers",
-      joinColumns = @JoinColumn(name = "comparison_id"))
+  @CollectionTable(name = "comparison_providers", joinColumns = @JoinColumn(name = "comparison_id"))
   @Enumerated(EnumType.STRING)
   @Column(name = "provider", nullable = false)
   private List<Provider> providers = new ArrayList<>();

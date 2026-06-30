@@ -12,8 +12,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * US3 (T043): every API route except the public ones requires an authenticated session. Unauthenticated
- * requests are rejected with {@code 401} (not redirected to a login page), so the SPA can react in code.
+ * US3 (T043): every API route except the public ones requires an authenticated session.
+ * Unauthenticated requests are rejected with {@code 401} (not redirected to a login page), so the
+ * SPA can react in code.
  */
 @SpringBootTest
 @AutoConfigureMockMvc

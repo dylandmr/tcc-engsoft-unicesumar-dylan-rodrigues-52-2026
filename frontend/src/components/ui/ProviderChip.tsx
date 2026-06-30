@@ -32,10 +32,7 @@ export function ProviderChip({
       )}
     >
       <span
-        className={cn(
-          'size-2 rounded-full',
-          selected ? style.dot : 'bg-mist',
-        )}
+        className={cn('size-2 rounded-full', selected ? style.dot : 'bg-mist')}
       />
       {meta.label}
     </button>

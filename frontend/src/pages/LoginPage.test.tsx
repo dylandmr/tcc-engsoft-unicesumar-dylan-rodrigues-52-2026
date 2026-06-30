@@ -9,7 +9,9 @@ describe('LoginPage', () => {
     renderApp({ route: '/login' })
     await userEvent.type(screen.getByLabelText('Username'), 'alice')
     await userEvent.type(screen.getByLabelText('Password'), 'pw')
-    await userEvent.click(screen.getByRole('button', { name: /Enter the arena/ }))
+    await userEvent.click(
+      screen.getByRole('button', { name: /Enter the arena/ }),
+    )
     await waitFor(() =>
       expect(
         screen.getByRole('heading', { name: /What should the models answer/ }),
@@ -26,7 +28,9 @@ describe('LoginPage', () => {
     renderApp({ route: '/login' })
     await userEvent.type(screen.getByLabelText('Username'), 'bad')
     await userEvent.type(screen.getByLabelText('Password'), 'creds')
-    await userEvent.click(screen.getByRole('button', { name: /Enter the arena/ }))
+    await userEvent.click(
+      screen.getByRole('button', { name: /Enter the arena/ }),
+    )
     expect(await screen.findByRole('alert')).toHaveTextContent(
       /Invalid username or password/,
     )

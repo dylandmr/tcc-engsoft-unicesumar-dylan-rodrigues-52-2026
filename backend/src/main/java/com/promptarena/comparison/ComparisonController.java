@@ -34,9 +34,9 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
  * REST + SSE endpoints for comparisons (US1/US2). Following the contract, {@code POST} only
- * validates and persists a {@code PENDING} comparison; the provider fan-out is triggered lazily when
- * the SSE stream is opened, so the client is always subscribed before any {@code result} event is
- * emitted. All data is scoped to the authenticated user (FR-016).
+ * validates and persists a {@code PENDING} comparison; the provider fan-out is triggered lazily
+ * when the SSE stream is opened, so the client is always subscribed before any {@code result} event
+ * is emitted. All data is scoped to the authenticated user (FR-016).
  */
 @RestController
 @RequestMapping("/api/comparisons")
@@ -64,7 +64,9 @@ public class ComparisonController {
     this.maxPromptLen = maxPromptLen;
   }
 
-  /** Validate, persist a {@code PENDING} comparison owned by the caller, return its id (FR-004/5/6). */
+  /**
+   * Validate, persist a {@code PENDING} comparison owned by the caller, return its id (FR-004/5/6).
+   */
   @PostMapping
   public ResponseEntity<CreateComparisonResponse> create(
       @RequestBody CreateComparisonRequest body) {
@@ -105,8 +107,8 @@ public class ComparisonController {
 
   /**
    * Open the live results stream. Opening triggers the fan-out for a {@code PENDING} comparison or
-   * replays a {@code COMPLETE} one (FR-008, FR-009, FR-010). The work runs on a virtual thread so it
-   * does not tie up the request thread; the emitter is always completed.
+   * replays a {@code COMPLETE} one (FR-008, FR-009, FR-010). The work runs on a virtual thread so
+   * it does not tie up the request thread; the emitter is always completed.
    */
   @GetMapping(value = "/{id}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
   public SseEmitter stream(@PathVariable String id) {
