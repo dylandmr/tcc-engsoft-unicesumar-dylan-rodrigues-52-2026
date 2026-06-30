@@ -48,13 +48,28 @@ jobs:
       - name: Build
         run: npm run build
 
+  semgrep:
+    name: Security · Semgrep (SAST/SCA/secrets)
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - name: Semgrep scan (Java + TS)
+        run: semgrep scan --config p/default --config p/secrets --error --metrics off
+
   docker:
-    name: Docker · image build + smoke test
+    name: Docker · image build + smoke test + Trivy scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Build image
         run: docker build -t prompt-arena:ci .
+      - name: Trivy image scan (fail on CRITICAL, fixed)
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:latest image --severity CRITICAL --ignore-unfixed \
+            --exit-code 1 --no-progress prompt-arena:ci
       - name: Run container
         run: docker run -d --name pa -p 8080:8080 prompt-arena:ci
       - name: Smoke test /api/health
