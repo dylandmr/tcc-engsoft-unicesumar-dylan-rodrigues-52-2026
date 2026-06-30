@@ -49,7 +49,7 @@ frontend: `frontend/src/`.
 
 - [ ] T007 Configure SQLite datasource + JPA in `backend/src/main/resources/application.properties` (jdbc:sqlite url, `org.sqlite.JDBC`, `SQLiteDialect`, HikariCP `maximum-pool-size=1`, `ddl-auto=update`)
 - [ ] T008 [P] Create JPA entity `User` (id, unique username, passwordHash, createdAt) in `backend/src/main/java/com/promptarena/model/User.java`
-- [ ] T009 [P] Create JPA entity `Comparison` (id, user FK, prompt, createdAt) in `backend/src/main/java/com/promptarena/model/Comparison.java`
+- [ ] T009 [P] Create JPA entity `Comparison` (id, user FK, prompt, `status` PENDING/COMPLETE, createdAt) + `Status` enum in `backend/src/main/java/com/promptarena/model/Comparison.java`
 - [ ] T010 [P] Create JPA entity `ProviderResult` + `Provider`/`Outcome` enums (provider, outcome, responseText, errorMessage, responseTimeMs; unique (comparison, provider)) in `backend/src/main/java/com/promptarena/model/`
 - [ ] T011 [P] Create Spring Data repositories `UserRepository`, `ComparisonRepository` in `backend/src/main/java/com/promptarena/repository/`
 - [ ] T012 Configure Spring Security session auth (BCryptPasswordEncoder, protected routes, CSRF for state-changing requests) in `backend/src/main/java/com/promptarena/config/SecurityConfig.java`
@@ -85,10 +85,10 @@ that each fills as its provider responds (fast before slow).
 - [ ] T024 [P] [US1] Implement OpenAI-compatible adapter (reused for ChatGPT/Grok/DeepSeek via base URL) in `backend/src/main/java/com/promptarena/provider/openai/OpenAiCompatibleProvider.java`
 - [ ] T025 [P] [US1] Implement Anthropic adapter in `backend/src/main/java/com/promptarena/provider/anthropic/AnthropicProvider.java`
 - [ ] T026 [P] [US1] Implement Google GenAI adapter in `backend/src/main/java/com/promptarena/provider/google/GeminiProvider.java`
-- [ ] T027 [US1] Implement provider registry/factory mapping `Provider` enum → `LlmProvider` (keys/base URLs from env) in `backend/src/main/java/com/promptarena/provider/ProviderRegistry.java` (depends on T024–T026)
-- [ ] T028 [US1] Implement fan-out orchestrator (`CompletableFuture.supplyAsync` over virtual-thread executor, `orTimeout` then `exceptionally`) in `backend/src/main/java/com/promptarena/comparison/ComparisonService.java` (depends on T027)
-- [ ] T029 [US1] Implement `POST /api/comparisons` with validation (non-empty prompt, 1–4 providers, no duplicates, known providers) in `backend/src/main/java/com/promptarena/comparison/ComparisonController.java`
-- [ ] T030 [US1] Implement `GET /api/comparisons/{id}/stream` SSE emitter pushing `result`/`done` events per provider in `backend/src/main/java/com/promptarena/comparison/ComparisonStreamController.java`
+- [ ] T027 [US1] Implement provider registry/factory mapping `Provider` enum → `LlmProvider`, reading `{base URL, API key, model id}` per provider from env (`*_MODEL` with defaults) in `backend/src/main/java/com/promptarena/provider/ProviderRegistry.java` (depends on T024–T026)
+- [ ] T028 [US1] Implement fan-out orchestrator (`CompletableFuture.supplyAsync` over virtual-thread executor, `orTimeout` then `exceptionally`) and capture per-provider `response_time_ms` in `backend/src/main/java/com/promptarena/comparison/ComparisonService.java` (depends on T027)
+- [ ] T029 [US1] Implement `POST /api/comparisons` — validate (non-empty prompt ≤ `MAX_PROMPT_LEN`, 1–4 providers, no duplicates, known providers), **persist the comparison as PENDING and return its id without dispatching providers** — in `backend/src/main/java/com/promptarena/comparison/ComparisonController.java`
+- [ ] T030 [US1] Implement `GET /api/comparisons/{id}/stream` SSE emitter that **triggers the fan-out on subscription when PENDING, or replays persisted results when COMPLETE**, pushing `result`/`done` events per provider, in `backend/src/main/java/com/promptarena/comparison/ComparisonStreamController.java`
 - [ ] T031 [P] [US1] Build `PromptInput` + `ProviderPicker` (enforce max 4, no duplicates) components in `frontend/src/components/`
 - [ ] T032 [P] [US1] Build `ProviderPanel` + Results view consuming the SSE stream in `frontend/src/pages/Results.tsx`
 - [ ] T033 [US1] Wire Comparison page (submit → create → open SSE → route events to panels) in `frontend/src/pages/Comparison.tsx` (depends on T031, T032)
@@ -166,10 +166,10 @@ a second user sees an empty state and never the first user's data.
 
 ### Implementation for User Story 4
 
-- [ ] T053 [US4] Persist `Comparison` + `ProviderResult`s after fan-out completes via a single writer path in `backend/src/main/java/com/promptarena/comparison/ComparisonService.java`
+- [ ] T053 [US4] Persist `Comparison` + `ProviderResult`s after fan-out completes via a single writer path and set `status = COMPLETE` in `backend/src/main/java/com/promptarena/comparison/ComparisonService.java`
 - [ ] T054 [US4] Implement `GET /api/comparisons` (list, newest-first, per-user) and `GET /api/comparisons/{id}` (detail; 404 if not owned) in `backend/src/main/java/com/promptarena/history/HistoryController.java`
-- [ ] T055 [P] [US4] Build History list (with empty state) + detail view in `frontend/src/pages/History.tsx`
-- [ ] T056 [US4] Record `response_time_ms` per provider during fan-out (constitution/TCC requirement) in `backend/src/main/java/com/promptarena/comparison/ComparisonService.java`
+- [ ] T055 [P] [US4] Build History list (with empty state) + detail view (showing each provider's response and `response_time_ms`) in `frontend/src/pages/History.tsx`
+- [ ] T056 [US4] Surface per-provider `response_time_ms` (captured in T028) in the comparison detail/history response and view (constitution/TCC requirement)
 
 **Checkpoint**: All user stories independently functional.
 

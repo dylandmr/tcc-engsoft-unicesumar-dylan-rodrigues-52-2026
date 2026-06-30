@@ -49,6 +49,7 @@ A single submitted prompt and the set of providers it targeted (FR-014).
 | id           | UUID / string | Primary key                                                  |
 | user_id      | FK → User.id  | Not null; indexed (history queries filter by user)           |
 | prompt       | text          | Not null, non-empty (FR-006)                                 |
+| status       | enum (Status) | Not null: PENDING (created, not yet run) or COMPLETE (run+persisted) |
 | created_at   | timestamp     | Not null, default now; history is ordered by this descending |
 
 **Rules**:
@@ -57,6 +58,9 @@ A single submitted prompt and the set of providers it targeted (FR-014).
 - Only **completed** comparisons are guaranteed to be persisted (spec Assumptions: in-flight on
   logout not guaranteed).
 - A `Comparison` is only ever readable by its owning `user_id` (FR-016).
+- `status` starts `PENDING` on `POST`; opening the SSE stream runs the fan-out and, on completion,
+  persists results and sets `status = COMPLETE`. A re-opened stream for a `COMPLETE` comparison
+  replays persisted results (no provider re-call).
 
 ### ProviderResult
 
@@ -105,6 +109,13 @@ SUCCESS   — provider returned non-empty content
 EMPTY     — provider returned successfully but with no content
 ERROR     — provider call failed (HTTP error, SDK exception, invalid response)
 TIMEOUT   — provider exceeded the per-provider response time limit (FR-012)
+```
+
+### Status (Comparison lifecycle)
+
+```text
+PENDING   — created and validated on POST; fan-out not yet run
+COMPLETE  — fan-out finished and ProviderResults persisted
 ```
 
 ## Validation Summary (traceability to FRs)

@@ -17,7 +17,9 @@ exposes a uniform `LlmProvider` interface implemented by three client libraries 
 reused for ChatGPT/Grok/DeepSeek via different base URLs, plus the official Anthropic and Google
 GenAI SDKs). A comparison fans out via `CompletableFuture` over a virtual-thread executor with
 per-call `orTimeout` + `exceptionally`, guaranteeing isolation, and streams results to the SPA over
-Server-Sent Events so panels update independently. Auth uses Spring Security sessions with BCrypt;
+Server-Sent Events so panels update independently. The fan-out is **triggered when the SSE stream is
+opened** (POST only validates/persists the comparison), so no result event can be missed and a
+re-opened stream replays persisted results. Auth uses Spring Security sessions with BCrypt;
 persistence is SQLite via Spring Data JPA. Everything ships as a Docker image launchable with
 `docker compose up`. (See [research.md](./research.md).)
 
@@ -40,12 +42,21 @@ React 18 + Vite; SSE via Spring MVC `SseEmitter` / browser `EventSource`
 **Project Type**: Web application (frontend SPA + backend REST service)
 
 **Performance Goals**: Panels begin populating within ~2s of submit excluding provider thinking time
-(SC-001); per-provider timeout enforced; demo-scale concurrency (a handful of users), not
-production load (spec Assumptions)
+(SC-001), asserted in the quickstart V1 timing check; per-provider timeout enforced; demo-scale
+concurrency target of **up to ~5 simultaneous users**, not production load (spec Assumptions)
+
+**Per-provider model**: each provider calls a single configured model id, supplied via env
+(`OPENAI_MODEL`, `ANTHROPIC_MODEL`, `GOOGLE_MODEL`, `XAI_MODEL`, `DEEPSEEK_MODEL`) with sensible
+defaults; the provider registry (`ProviderRegistry`) reads base URL + key + model per provider so
+the comparison is reproducible and the model is explicit.
+
+**Tunable defaults**: `MAX_PROMPT_LEN` = 8000 characters; `PROVIDER_TIMEOUT_MS` = 45000 ms. Both are
+configurable; these are the prototype defaults.
 
 **Constraints**: Provider secrets server-side only (FR-018); per-provider isolation — one failure
 must not block/delay others (FR-010); data strictly scoped per user (FR-016); SQLite single-writer
-posture under concurrent fan-out
+posture under concurrent fan-out; CSRF on state-changing POSTs while the SSE GET authenticates via
+session cookie only (`EventSource` cannot set headers)
 
 **Scale/Scope**: 4 screens (login, comparison, results, history); 5 providers (≤4 per prompt); ~7
 REST endpoints; 3 persisted entities; solo-maintained academic prototype
@@ -123,6 +134,11 @@ Dockerfile(s)                     # Backend image (multi-stage build incl. SPA)
 architecture (layered client-server; SPA + Spring Boot REST API + SQLite, containerized for local
 execution). The SPA is served same-origin with the API in the Docker image so the session cookie is
 same-origin (research Decision 4).
+
+**Auth/US1 sequencing note**: although Sign-in is its own P1 story (US3), the Spring Security
+framework + a seeded user live in the Foundational phase so US1 (the core comparison) can be built
+and tested behind an authenticated session before the user-facing login/logout journey (US3) is
+implemented. This keeps each story independently testable without circular dependencies.
 
 ## Complexity Tracking
 

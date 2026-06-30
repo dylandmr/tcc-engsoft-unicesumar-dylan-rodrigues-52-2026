@@ -25,13 +25,20 @@ ANTHROPIC_API_KEY=...     # Claude
 GOOGLE_API_KEY=...        # Gemini
 XAI_API_KEY=...           # Grok   (OpenAI-compatible, base https://api.x.ai/v1)
 DEEPSEEK_API_KEY=...      # DeepSeek (OpenAI-compatible, base https://api.deepseek.com)
+
+# Per-provider model id (each provider calls exactly one configured model; defaults applied if unset)
+OPENAI_MODEL=...
+ANTHROPIC_MODEL=...
+GOOGLE_MODEL=...
+XAI_MODEL=...
+DEEPSEEK_MODEL=...
 ```
 
 A provider with no key configured is treated as unavailable and surfaces a per-provider error
 (it never breaks the others — FR-010).
 
-Tunable limits (finalized in implementation): `MAX_PROMPT_LEN`, per-provider timeout
-(`PROVIDER_TIMEOUT_MS`).
+Tunable limits (prototype defaults; override via env): `MAX_PROMPT_LEN` = **8000** characters,
+per-provider timeout `PROVIDER_TIMEOUT_MS` = **45000** ms.
 
 ## Run the prototype (single command)
 
@@ -55,8 +62,9 @@ Each scenario maps to user stories and success criteria in [spec.md](./spec.md).
 1. Sign in as the seed user.
 2. Enter a prompt, select 3–4 providers, submit.
 3. **Expect**: one labeled panel per selected provider, side by side; each panel fills as its
-   provider responds, independently (a fast provider shows before a slow one). Panels begin
-   populating within ~2s of submission (SC-001).
+   provider responds, independently (a fast provider shows before a slow one). **Timing check
+   (SC-001)**: the panels appear and the SSE stream opens within ~2s of submission (measure
+   submit→first `result`/stream-open, excluding provider thinking time).
 4. Try to select a 5th provider → **blocked** with the limit communicated.
 5. Submit with empty prompt or zero providers → **blocked** with a validation message.
 

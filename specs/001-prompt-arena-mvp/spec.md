@@ -226,5 +226,5 @@ never appear.
   highlighting, streaming token-by-token) is a desirable enhancement, not a hard requirement for the
   MVP, and its inclusion is deferred to planning.
 - **Single user concurrency target**: As a solo academic prototype, the platform targets demo-scale
-  concurrent usage (a handful of simultaneous users), not production-scale load.
+  concurrent usage (up to ~5 simultaneous users), not production-scale load.
 - **Connectivity**: Users have stable internet connectivity and modern browsers.

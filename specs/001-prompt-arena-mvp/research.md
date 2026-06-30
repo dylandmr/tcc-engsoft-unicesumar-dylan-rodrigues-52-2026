@@ -24,6 +24,21 @@ compatible, so one well-tested OpenAI adapter covers three providers. Anthropic 
 official Java SDKs. This satisfies Constitution II (uniform interface, no SDK types leaking past the
 adapter layer) with the least integration code (Constitution V, YAGNI).
 
+**Per-provider model (resolves underspecification)**: each provider targets exactly one configured
+model id, supplied via env so the comparison is explicit and reproducible. The `ProviderRegistry`
+reads `{base URL, API key, model}` per provider:
+
+| Provider | Key env | Model env | Base URL |
+|---|---|---|---|
+| ChatGPT | `OPENAI_API_KEY` | `OPENAI_MODEL` | default OpenAI |
+| Grok | `XAI_API_KEY` | `XAI_MODEL` | `https://api.x.ai/v1` |
+| DeepSeek | `DEEPSEEK_API_KEY` | `DEEPSEEK_MODEL` | `https://api.deepseek.com` |
+| Claude | `ANTHROPIC_API_KEY` | `ANTHROPIC_MODEL` | default Anthropic |
+| Gemini | `GOOGLE_API_KEY` | `GOOGLE_MODEL` | default Google |
+
+Each `*_MODEL` has a sensible default constant; verify exact model ids against the provider's current
+catalog at build time.
+
 **Alternatives considered**:
 - *Five distinct official SDKs* — not possible; two don't exist for Java.
 - *Spring AI (`org.springframework.ai`)* — would unify all five behind one `ChatModel`. Viable, but
@@ -60,6 +75,17 @@ as each provider yields. The React client consumes them (native `EventSource`, o
 arrives** (FR-009) — the core UX. SSE is one-way server→client, exactly the data flow needed. All
 three client libraries support token streaming. Drive emitters on virtual threads so blocking stream
 reads don't tie up request threads; always `complete()`/`completeWithError()` per stream.
+
+**Fan-out trigger (resolves design ambiguity)**: the fan-out is triggered **when the SSE stream is
+opened**, not on `POST /comparisons`. `POST` only validates and persists the comparison in `PENDING`
+state and returns its id; opening the stream runs the orchestrator and streams results, persisting
+on completion and marking it `COMPLETE`. Re-opening a `COMPLETE` comparison's stream **replays**
+persisted results without re-calling providers. This guarantees the client is subscribed before any
+event is emitted (no lost events) and keeps provider calls idempotent.
+
+**Auth on the SSE endpoint**: the stream is a `GET` and authenticates via the session cookie only —
+the browser `EventSource` API cannot set custom headers, so CSRF is applied to state-changing POSTs
+but not to this GET.
 
 **Alternatives considered**:
 - *Single aggregated JSON after all complete* — trivially simple, no SSE plumbing, but defeats

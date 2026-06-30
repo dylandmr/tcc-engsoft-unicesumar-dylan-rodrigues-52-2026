@@ -14,6 +14,11 @@ Base path: `/api`
 - Accessing another user's resource returns **404 Not Found** (do not reveal existence) (FR-016).
 - Validation failures return **400 Bad Request** with a machine-readable `error` code.
 - Timestamps are ISO-8601 UTC.
+- **Session & CSRF**: auth is a session cookie. State-changing requests (`POST /auth/login`,
+  `POST /auth/logout`, `POST /comparisons`) require a **CSRF token**: the SPA reads it from a
+  bootstrap cookie/endpoint and echoes it in the `X-XSRF-TOKEN` header. The SSE endpoint is a
+  **GET** (non-state-changing), so it is exempt from CSRF and authenticates via the session cookie
+  alone — this is required because the browser `EventSource` API cannot set custom headers.
 
 ---
 
@@ -57,8 +62,10 @@ Return the current session's user; used by the SPA to gate protected screens.
 
 ### POST /api/comparisons
 
-Create and run a comparison. Validates input, fans out to the selected providers concurrently, and
-returns the created comparison id. Requires auth.
+Create a comparison. Validates input and **persists** the comparison record (prompt, providers,
+owner) in a `PENDING` state, then returns its id. This call does **not** dispatch the providers —
+the fan-out is triggered lazily when the SSE stream below is opened (see "Fan-out trigger" note).
+Requires auth.
 
 Request:
 ```json
@@ -82,10 +89,22 @@ Responses:
 
 The client then opens the SSE stream below to receive results live.
 
+**Fan-out trigger (resolves design ambiguity)**: provider dispatch is **triggered by opening the SSE
+stream**, not by `POST`. This guarantees the client is subscribed before any `result` event is
+emitted, so no event is missed. Behavior by comparison state when the stream is opened:
+
+- `PENDING` → run the fan-out now, stream each `result` as it arrives, persist on completion, then
+  mark the comparison `COMPLETE`.
+- `COMPLETE` (stream re-opened, e.g. from history) → **replay** the persisted results as `result`
+  events (no providers are called again).
+
+This makes the stream idempotent and avoids duplicate provider calls or lost events.
+
 ### GET /api/comparisons/{id}/stream
 
 Server-Sent Events stream of per-provider results for a comparison the caller owns (FR-008, FR-009,
-FR-010). Requires auth. `Content-Type: text/event-stream`.
+FR-010). Opening the stream triggers (or replays) the fan-out per the note above. Requires auth.
+`Content-Type: text/event-stream`.
 
 Events (each `data:` payload is JSON; events are tagged with `event:` name):
 
