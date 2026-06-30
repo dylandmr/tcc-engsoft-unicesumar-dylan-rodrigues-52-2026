@@ -65,7 +65,7 @@ projects exist; do the minimal scaffold, then wire the gates.
 - [ ] T003 [P] Add provider + infra dependencies to `backend/pom.xml` (`com.openai:openai-java`, `com.anthropic:anthropic-java`, `com.google.genai:google-genai`, `org.xerial:sqlite-jdbc`, `org.hibernate.orm:hibernate-community-dialects`, WireMock, JUnit 5, Mockito)
 - [X] T004 [P] Initialize React 18 + Vite + TypeScript app in `frontend/` (`package.json`, `vite.config.ts`, Vitest + React Testing Library + MSW dev deps) — scaffolded via create-vite react-ts; deps installed (Vitest/RTL/MSW added in a later step)
 - [ ] T005 [P] Configure backend formatting (Spotless) and frontend ESLint + Prettier configs
-- [ ] T006 [P] Create `.env.example` documenting provider key vars (OPENAI/ANTHROPIC/GOOGLE/XAI/DEEPSEEK) and confirm `.env`, `data/`, `*.db` are in `.gitignore`
+- [X] T006 [P] Create `.env.example` documenting provider key vars (OPENAI/ANTHROPIC/GOOGLE/XAI/DEEPSEEK) and confirm `.env`, `data/`, `*.db` are in `.gitignore`
 
 ---
 
@@ -207,8 +207,8 @@ a second user sees an empty state and never the first user's data.
 
 **Purpose**: Packaging, hardening, and end-to-end validation across stories
 
-- [ ] T057 [P] Multi-stage `backend/Dockerfile` (build SPA + backend; serve SPA same-origin with the API)
-- [ ] T058 Author root `docker-compose.yml` so `docker compose up` runs backend + persists SQLite volume; wire env vars
+- [X] T057 [P] Multi-stage `backend/Dockerfile` (build SPA + backend; serve SPA same-origin with the API)
+- [X] T058 Author root `docker-compose.yml` so `docker compose up` runs backend + persists SQLite volume; wire env vars
 - [ ] T059 [P] Enable `PRAGMA journal_mode=WAL` + `busy_timeout` at startup and verify no `SQLITE_BUSY` under concurrent writes
 - [ ] T060 [P] Security hardening: confirm CSRF on state-changing routes and that provider keys never reach the client (FR-018)
 - [ ] T061 [P] Write `README.md` run instructions and complete `.env.example`

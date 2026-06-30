@@ -2,6 +2,7 @@ package com.promptarena.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -20,6 +21,17 @@ public class SecurityConfig {
     http.authorizeHttpRequests(
             auth ->
                 auth.requestMatchers("/api/health", "/actuator/health")
+                    .permitAll()
+                    // Serve the bundled SPA (static assets) same-origin
+                    .requestMatchers(
+                        HttpMethod.GET,
+                        "/",
+                        "/index.html",
+                        "/favicon.ico",
+                        "/assets/**",
+                        "/*.svg",
+                        "/*.png",
+                        "/icons.svg")
                     .permitAll()
                     .anyRequest()
                     .authenticated())
