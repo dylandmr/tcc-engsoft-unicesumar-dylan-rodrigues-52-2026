@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "packageManager": "npm",
+  "testRunner": "vitest",
+  "coverageAnalysis": "perTest",
+  "mutate": [
+    "src/**/*.{ts,tsx}",
+    "!src/**/*.test.{ts,tsx}",
+    "!src/main.tsx",
+    "!src/vite-env.d.ts"
+  ],
+  "reporters": ["clear-text", "progress"],
+  "//": "break starts at 0 (report-only) on the near-empty scaffold; raised once US1 lands logic.",
+  "thresholds": { "high": 80, "low": 60, "break": 0 }
+}

@@ -136,6 +136,38 @@
 					</execution>
 				</executions>
 			</plugin>
+			<!-- Mutation testing gate (Constitution v1.3.0). Run on demand:
+			     ./mvnw test-compile org.pitest:pitest-maven:mutationCoverage
+			     Threshold starts at 0 (report-only) on the near-empty scaffold and is raised
+			     once US1 lands real logic to mutate. -->
+			<plugin>
+				<groupId>org.pitest</groupId>
+				<artifactId>pitest-maven</artifactId>
+				<version>1.25.5</version>
+				<dependencies>
+					<dependency>
+						<groupId>org.pitest</groupId>
+						<artifactId>pitest-junit5-plugin</artifactId>
+						<version>1.2.3</version>
+					</dependency>
+				</dependencies>
+				<configuration>
+					<targetClasses>
+						<param>com.promptarena.*</param>
+					</targetClasses>
+					<excludedClasses>
+						<param>com.promptarena.PromptArenaApplication</param>
+						<param>com.promptarena.config.*</param>
+						<param>com.promptarena.model.*</param>
+					</excludedClasses>
+					<failWhenNoMutations>false</failWhenNoMutations>
+					<mutationThreshold>0</mutationThreshold>
+					<outputFormats>
+						<param>HTML</param>
+						<param>XML</param>
+					</outputFormats>
+				</configuration>
+			</plugin>
 		</plugins>
 	</build>
 

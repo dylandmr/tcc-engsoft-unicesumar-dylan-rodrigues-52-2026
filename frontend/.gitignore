@@ -25,3 +25,7 @@ dist-ssr
 
 # Coverage output
 coverage/
+
+# Mutation testing artifacts
+.stryker-tmp/
+reports/
