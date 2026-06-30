@@ -28,6 +28,30 @@ frontend: `frontend/src/`.
 
 ---
 
+## Phase 0: Harness & Quality Gates (Constitution v1.2.0)
+
+**Purpose**: Stand up the design direction, quality gates, and CI/container pipeline **before**
+feature work, so every later story lands on a proven, gated harness. (IDs are append-only — T064+ —
+to preserve the existing GitHub issue mapping; this phase still executes **first**.)
+
+**⚠️ Runs before Phase 1.** Some tasks here overlap Phase 1 scaffolding (T002/T004) and assume the
+projects exist; do the minimal scaffold, then wire the gates.
+
+- [ ] T071 Mock the 4 screens (login / composer / results-arena / history) in **Figma** in the "Observation Deck" direction; get approval before building UI (design artifact under `design/`)
+- [ ] T064 Add a backend health endpoint (Spring Boot Actuator `/actuator/health` or a trivial `/api/health`) for the CI smoke test, in `backend/src/main/java/com/promptarena/health/`
+- [ ] T065 Configure JaCoCo coverage gate in `backend/pom.xml`: **100% line+branch on logic packages** (`provider`, `comparison`, `auth`, `history`) with a documented exclusion list (`model/*` entities/DTOs, `config/*`, `*Application`); `mvn verify` fails below threshold
+- [ ] T066 Configure Vitest coverage gate in `frontend/vitest.config.ts`: **100% thresholds** on components/hooks/api with exclusions (`*.d.ts`, `main.tsx`, generated); test run fails below threshold
+- [ ] T067 [P] GitHub Actions CI — **backend job** in `.github/workflows/ci.yml`: JDK 21, `mvn verify` (tests + JaCoCo gate)
+- [ ] T068 [P] GitHub Actions CI — **frontend job**: Node 20, `npm ci`, `npm test -- --coverage` (Vitest gate), `npm run build`
+- [ ] T069 GitHub Actions CI — **docker job**: build the image, `docker compose up`, poll the health endpoint and assert 200 (proves the image runs remotely)
+- [ ] T070 Configure **branch protection** on `develop` and `main`: require the CI checks (backend, frontend, docker) before merge (GitHub settings / `gh api`)
+- [ ] T072 Build the **design-system foundation**: Tailwind CSS + shadcn/ui (Radix) + Observation Deck design tokens (color/type/space/radius, light + dark) + Framer Motion motion primitives + base components, in `frontend/src/styles/` and `frontend/src/components/ui/`
+- [ ] T073 Write a welcoming root `README.md` (pitch + TCC context, architecture summary, stack, `docker compose up` quickstart, SDD/Spec-Kit note, links to the spec & the issues board, screenshots section)
+
+**Checkpoint**: Design approved, gates live, CI green on a trivial PR — the harness is proven.
+
+---
+
 ## Phase 1: Setup (Shared Infrastructure)
 
 **Purpose**: Project initialization and basic structure
@@ -243,8 +267,11 @@ Task: T026 Google GenAI adapter
 
 ## Implementation Strategy
 
-### MVP First (User Story 1)
+### Harness First (Phase 0), then MVP (User Story 1)
 
+0. **Phase 0 Harness** — Figma approval, gates (JaCoCo/Vitest 100% logic), CI (build/test/coverage/
+   docker smoke), branch protection, design-system foundation, README. Prove the harness on a
+   trivial green PR.
 1. Phase 1 Setup → 2. Phase 2 Foundational → 3. Phase 3 US1 → **STOP & VALIDATE** (V1) → demo.
 
 ### Incremental Delivery

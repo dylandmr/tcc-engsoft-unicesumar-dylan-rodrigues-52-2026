@@ -1,10 +1,25 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.0.0 → 1.1.0
-Rationale: Materially revised two sections to match the authoritative TCC document
+Version change: 1.1.0 → 1.2.0
+Rationale: Added two non-negotiable quality gates to "Development Workflow & Quality Gates" — a
+Continuous Integration gate and a Test Coverage gate — and strengthened the Definition of Done
+accordingly. New materially-expanded guidance, no core principle redefined → MINOR bump.
+
+Sections modified (1.2.0):
+  ~ Development Workflow & Quality Gates
+      + CI gate: every PR MUST pass an automated pipeline (build, tests, coverage gate, container
+        image build + smoke test) before merge; gates are required status checks on protected branches.
+      + Coverage gate: logic code MUST hold 100% line+branch coverage (backend JaCoCo, frontend
+        Vitest) with a documented, reviewed exclusion list for non-logic (entities/DTOs, config,
+        entrypoints, generated code); the build/PR fails below the threshold.
+  ~ Definition of Done: now requires the CI pipeline green (incl. coverage gate) and a successful
+        containerized run.
+
+----- Prior change (1.0.0 → 1.1.0) -----
+Materially revised two sections to match the authoritative TCC document
 (docs/DYLAN RODRIGUES - ATIVIDADE 1 ... 52_2026.pdf). No core principle was added, removed, or
-redefined, so this is a MINOR bump.
+redefined.
 
 Principles (unchanged):
   I.   Spec-Driven Development
@@ -111,10 +126,21 @@ plan's Constitution Check.
   features.
 - **Constitution Check**: every plan MUST pass the Constitution Check section; any violation MUST be
   recorded with explicit justification or the design MUST be revised.
+- **Continuous Integration gate**: every pull request MUST pass an automated CI pipeline before
+  merge — at minimum: build the backend and frontend, run all automated tests, enforce the coverage
+  gate (below), and build the Docker image and smoke-test it (container starts and a health check
+  returns success). These checks MUST be configured as required status checks on protected branches
+  (`develop`, `main`); a failing pipeline blocks the merge.
+- **Coverage gate**: logic code MUST maintain 100% line and branch coverage — backend via JaCoCo,
+  frontend via Vitest — enforced in CI so the build/PR fails below the threshold. A documented,
+  reviewed exclusion list MAY exempt genuinely non-logic code (JPA entities/DTOs, framework
+  configuration, application entrypoints, generated code); exclusions are deliberate, not a means of
+  evading meaningful tests.
 - **Validation**: performed incrementally via direct access to the running local prototype and
   internal reviews at the end of each specification/implementation cycle.
-- **Definition of done**: spec satisfied, automated tests for affected integrations passing, secrets
-  kept out of version control, and behavior validated through direct access and internal review.
+- **Definition of done**: spec satisfied; the CI pipeline green (build, all tests, 100% coverage
+  gate, and a successful containerized run); secrets kept out of version control; and behavior
+  validated through direct access and internal review.
 
 ## Governance
 
@@ -126,4 +152,4 @@ for clarifications and wording. All plans and reviews MUST verify compliance wit
 and unjustified complexity is grounds for rejecting a change. Runtime development guidance for the
 coding agent lives in `CLAUDE.md`.
 
-**Version**: 1.1.0 | **Ratified**: 2026-06-28 | **Last Amended**: 2026-06-29
+**Version**: 1.2.0 | **Ratified**: 2026-06-28 | **Last Amended**: 2026-06-30

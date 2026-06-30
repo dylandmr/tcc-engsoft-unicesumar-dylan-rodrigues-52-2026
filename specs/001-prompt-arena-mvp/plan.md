@@ -53,6 +53,18 @@ the comparison is reproducible and the model is explicit.
 **Tunable defaults**: `MAX_PROMPT_LEN` = 8000 characters; `PROVIDER_TIMEOUT_MS` = 45000 ms. Both are
 configurable; these are the prototype defaults.
 
+**UX / design system**: "Observation Deck" direction — a dark-first, telemetry-themed arena where
+each provider runs in its own brand-hued lane and streams its answer live with a mono latency
+readout; a single warm "ignition" accent for launch/live states. Built with Tailwind CSS +
+shadcn/ui (Radix) + Framer Motion over a design-token foundation (color/type/space/radius, light +
+dark). Type: Space Grotesk (display), IBM Plex Sans (body), IBM Plex Mono (data/telemetry). The four
+screens are mocked in Figma for approval before implementation.
+
+**Quality harness** (Constitution v1.2.0): GitHub Actions CI on every PR — backend `mvn verify`
+(JaCoCo 100%-logic gate), frontend Vitest 100%-logic gate + build, and a Docker image build + smoke
+test (health check). A backend health endpoint backs the smoke test. Required status checks on
+`develop`/`main`. The harness is built first (Phase 0) before feature work.
+
 **Constraints**: Provider secrets server-side only (FR-018); per-provider isolation — one failure
 must not block/delay others (FR-010); data strictly scoped per user (FR-016); SQLite single-writer
 posture under concurrent fan-out; CSRF on state-changing POSTs while the SSE GET authenticates via
@@ -72,6 +84,8 @@ REST endpoints; 3 persisted entities; solo-maintained academic prototype
 | **III. Test Discipline for Integrations** | Provider adapters tested with WireMock (success/empty/error/timeout/SSE) and the router with Mockito — all without live keys/network. Auth covered. Contract/router changes update tests in the same change. | ✅ Pass |
 | **IV. Security & Secrets Management** | Keys only in server-side env / git-ignored `.env`, never sent to client (FR-018). Spring Security session auth on every protected route; data scoped per user (FR-016); BCrypt password hashing. | ✅ Pass |
 | **V. Simplicity & Solo-Maintainability (YAGNI)** | Hybrid abstraction = 3 libraries cover 5 providers (less code). Virtual threads + `CompletableFuture` chosen over preview structured concurrency / reactive stack. SQLite + Docker-local match scope. SSE adds modest complexity but is **required** by FR-009 (independent panel population); aggregate-JSON fallback documented. No speculative abstractions. | ✅ Pass |
+| **CI gate** (v1.2.0) | GitHub Actions on every PR: build backend + frontend, run all tests, enforce coverage gate, build the Docker image and smoke-test it (health check). Required status checks on `develop`/`main`. | ✅ Planned (Phase 0) |
+| **Coverage gate** (v1.2.0) | 100% line+branch on logic — backend JaCoCo, frontend Vitest — with a documented exclusion list (entities/DTOs, config, entrypoints, generated). Build/PR fails below threshold. | ✅ Planned (Phase 0) |
 
 **Technology & Architecture Constraints**: matches the constitution exactly (React+Vite SPA, Java
 Spring Boot REST, SQLite, Docker-local, scope ceiling = minimal auth + ≤4 providers + history). No
@@ -116,17 +130,27 @@ backend/                         # Java 21 / Spring Boot REST service
 │   └── application.properties    # SQLite datasource, dialect, pool, timeouts
 └── src/test/java/...             # JUnit 5 + WireMock (adapters) + Mockito (orchestration)
 
+│   ├── health/                   # Health endpoint (Actuator or /api/health) for the CI smoke test
+│   └── ...
+└── pom.xml                       # incl. JaCoCo 100%-logic coverage gate + exclusions
+
 frontend/                        # React 18 + Vite (TypeScript) SPA
 ├── src/
 │   ├── pages/                    # Login, Comparison, Results, History
 │   ├── components/               # ProviderPanel, ProviderPicker, PromptInput, etc.
+│   ├── components/ui/            # shadcn/ui (Radix) primitives
+│   ├── styles/ (tokens)          # design tokens — Observation Deck palette/type/motion
 │   ├── api/                      # REST client + EventSource (SSE) handling
 │   └── auth/                     # Session context / route guards
-└── src/__tests__/                # Vitest + React Testing Library + MSW
+├── src/__tests__/                # Vitest + React Testing Library + MSW
+└── vitest.config.ts              # 100%-logic coverage thresholds + exclusions
 
+.github/workflows/ci.yml          # CI: backend+frontend build/test/coverage gate + docker smoke test
 docker-compose.yml                # `docker compose up` — backend + served SPA + SQLite volume
 Dockerfile(s)                     # Backend image (multi-stage build incl. SPA)
-.env.example                      # Documented provider key vars (real .env git-ignored)
+README.md                         # Welcoming public-repo landing (pitch, stack, quickstart, links)
+.env.example                      # Documented provider key + model vars (real .env git-ignored)
+design/                           # Figma export/reference for the Observation Deck screens
 ```
 
 **Structure Decision**: Web application (Option 2) — a `backend/` Spring Boot service and a
