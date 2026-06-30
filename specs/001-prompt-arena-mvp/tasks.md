@@ -76,14 +76,14 @@ projects exist; do the minimal scaffold, then wire the gates.
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
 - [X] T007 Configure SQLite datasource + JPA in `backend/src/main/resources/application.properties` (jdbc:sqlite url, `org.sqlite.JDBC`, `SQLiteDialect`, HikariCP `maximum-pool-size=1`, `ddl-auto=update`) — + in-memory test profile; verified connecting (SQLite 3.50.3). WAL pragma still pending (T059)
-- [ ] T008 [P] Create JPA entity `User` (id, unique username, passwordHash, createdAt) in `backend/src/main/java/com/promptarena/model/User.java`
-- [ ] T009 [P] Create JPA entity `Comparison` (id, user FK, prompt, `status` PENDING/COMPLETE, createdAt) + `Status` enum in `backend/src/main/java/com/promptarena/model/Comparison.java`
-- [ ] T010 [P] Create JPA entity `ProviderResult` + `Provider`/`Outcome` enums (provider, outcome, responseText, errorMessage, responseTimeMs; unique (comparison, provider)) in `backend/src/main/java/com/promptarena/model/`
-- [ ] T011 [P] Create Spring Data repositories `UserRepository`, `ComparisonRepository` in `backend/src/main/java/com/promptarena/repository/`
+- [X] T008 [P] Create JPA entity `User` (id, unique username, passwordHash, createdAt) in `backend/src/main/java/com/promptarena/model/User.java`
+- [X] T009 [P] Create JPA entity `Comparison` (id, user FK, prompt, `status` PENDING/COMPLETE, createdAt) + `Status` enum in `backend/src/main/java/com/promptarena/model/Comparison.java`
+- [X] T010 [P] Create JPA entity `ProviderResult` + `Provider`/`Outcome` enums (provider, outcome, responseText, errorMessage, responseTimeMs; unique (comparison, provider)) in `backend/src/main/java/com/promptarena/model/`
+- [X] T011 [P] Create Spring Data repositories `UserRepository`, `ComparisonRepository` in `backend/src/main/java/com/promptarena/repository/`
 - [ ] T012 Configure Spring Security session auth (BCryptPasswordEncoder, protected routes, CSRF for state-changing requests) in `backend/src/main/java/com/promptarena/config/SecurityConfig.java`
 - [ ] T013 Seed a demo user at startup (CommandLineRunner) in `backend/src/main/java/com/promptarena/config/DataSeeder.java`
-- [ ] T014 [P] Define uniform `LlmProvider` interface + `PromptRequest`/`ProviderResult` DTOs (no SDK types leak) in `backend/src/main/java/com/promptarena/provider/LlmProvider.java`
-- [ ] T015 [P] Configure virtual-thread executor bean in `backend/src/main/java/com/promptarena/config/ConcurrencyConfig.java`
+- [X] T014 [P] Define uniform `LlmProvider` interface + `PromptRequest`/`ProviderResult` DTOs (no SDK types leak) in `backend/src/main/java/com/promptarena/provider/LlmProvider.java`
+- [X] T015 [P] Configure virtual-thread executor bean in `backend/src/main/java/com/promptarena/config/ConcurrencyConfig.java`
 - [ ] T016 [P] Add global REST error handling (`@RestControllerAdvice`) with machine-readable error codes in `backend/src/main/java/com/promptarena/config/ApiExceptionHandler.java`
 - [ ] T017 [P] Scaffold frontend routing + protected-route guard + session context in `frontend/src/App.tsx` and `frontend/src/auth/`
 - [ ] T018 [P] Create frontend REST client + SSE (`EventSource`) helper in `frontend/src/api/`

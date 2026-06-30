@@ -106,6 +106,7 @@
 						<exclude>**/PromptArenaApplication.class</exclude>
 						<exclude>**/config/**</exclude>
 						<exclude>**/model/**</exclude>
+						<exclude>**/dto/**</exclude>
 					</excludes>
 				</configuration>
 				<executions>
@@ -159,6 +160,7 @@
 						<param>com.promptarena.PromptArenaApplication</param>
 						<param>com.promptarena.config.*</param>
 						<param>com.promptarena.model.*</param>
+						<param>com.promptarena.dto.*</param>
 					</excludedClasses>
 					<failWhenNoMutations>false</failWhenNoMutations>
 					<mutationThreshold>0</mutationThreshold>
