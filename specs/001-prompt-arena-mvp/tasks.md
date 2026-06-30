@@ -44,11 +44,11 @@ projects exist; do the minimal scaffold, then wire the gates.
 - [X] T067 [P] GitHub Actions CI — **backend job** in `.github/workflows/ci.yml`: JDK 21 (temurin, maven cache), `./mvnw -B verify`
 - [X] T068 [P] GitHub Actions CI — **frontend job**: Node 22, `npm ci`, `npm run test:coverage` (Vitest gate), `npm run build`
 - [X] T069 GitHub Actions CI — **docker job**: build the image, `docker compose up`, poll the health endpoint and assert 200 (proves the image runs remotely)
-- [ ] T070 Configure **branch protection** on `develop` and `main`: require the CI checks (backend, frontend, docker) before merge (GitHub settings / `gh api`)
+- [X] T070 Configure **branch protection** on `develop` and `main`: require the CI checks (backend, frontend, docker) before merge (GitHub settings / `gh api`)
 - [ ] T072 Build the **design-system foundation**: Tailwind CSS + shadcn/ui (Radix) + Observation Deck design tokens (color/type/space/radius, light + dark) + Framer Motion motion primitives + base components, in `frontend/src/styles/` and `frontend/src/components/ui/`. **Apply the design-review sharpening here (carried over from Figma):** (a) per-lane telemetry footer pinned to the bottom (token count + copy) with fuller responses so lanes don't read empty; (b) a "first to respond" badge on the fastest lane; (c) an ambient radial-glow backdrop on Login/Composer so they aren't floating in void; (d) the signature motion — an orchestrated launch sequence on Run, streaming token reveal per lane, and latency counting up live (this is where the "arena" distinctiveness lands)
 - [X] T073 Write a welcoming root `README.md` (pitch + TCC context, architecture summary, stack, `docker compose up` quickstart, SDD/Spec-Kit note, links to the spec & the issues board, screenshots section)
 - [X] T074 [P] CI **security gate — Semgrep** (SAST + dependency/SCA + secrets) scanning Java + TS in `.github/workflows/ci.yml`; fail PR on blocking findings (Constitution v1.3.0)
-- [ ] T075 [P] CI **quality gate — SonarCloud** static analysis (Java + React) + quality-gate status in CI (requires SonarCloud token secret) (Constitution v1.3.0)
+- [~] T075 [P] CI **quality gate — SonarCloud** static analysis (Java + React) + quality-gate status in CI (requires SonarCloud token secret) (Constitution v1.3.0)
 - [X] T076 [P] CI **mutation-testing gate** — PIT (Java, `backend/`) + Stryker (TS, `frontend/`); report mutation score and enforce a minimum threshold (Constitution v1.3.0)
 - [X] T077 [P] CI **container scan — Trivy** of the built image/Dockerfile in the docker job; fail on high/critical CVEs (Constitution v1.3.0)
 
