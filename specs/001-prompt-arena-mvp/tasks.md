@@ -61,9 +61,9 @@ projects exist; do the minimal scaffold, then wire the gates.
 **Purpose**: Project initialization and basic structure
 
 - [ ] T001 Create monorepo structure (`backend/`, `frontend/`, root `docker-compose.yml`, `.env.example`) per plan.md
-- [ ] T002 Initialize Spring Boot 3.x backend (Maven, Java 21) in `backend/pom.xml` with web, security, validation, data-jpa starters
+- [X] T002 Initialize Spring Boot 3.x backend (Maven, Java 21) in `backend/pom.xml` with web, security, validation, data-jpa starters — scaffolded via Spring Initializr (web, security, validation, data-jpa, actuator) + Maven Wrapper; compiles clean
 - [ ] T003 [P] Add provider + infra dependencies to `backend/pom.xml` (`com.openai:openai-java`, `com.anthropic:anthropic-java`, `com.google.genai:google-genai`, `org.xerial:sqlite-jdbc`, `org.hibernate.orm:hibernate-community-dialects`, WireMock, JUnit 5, Mockito)
-- [ ] T004 [P] Initialize React 18 + Vite + TypeScript app in `frontend/` (`package.json`, `vite.config.ts`, Vitest + React Testing Library + MSW dev deps)
+- [X] T004 [P] Initialize React 18 + Vite + TypeScript app in `frontend/` (`package.json`, `vite.config.ts`, Vitest + React Testing Library + MSW dev deps) — scaffolded via create-vite react-ts; deps installed (Vitest/RTL/MSW added in a later step)
 - [ ] T005 [P] Configure backend formatting (Spotless) and frontend ESLint + Prettier configs
 - [ ] T006 [P] Create `.env.example` documenting provider key vars (OPENAI/ANTHROPIC/GOOGLE/XAI/DEEPSEEK) and confirm `.env`, `data/`, `*.db` are in `.gitignore`
 
