@@ -1,10 +1,16 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.1.0 → 1.2.0
-Rationale: Added two non-negotiable quality gates to "Development Workflow & Quality Gates" — a
+Version change: 1.2.0 → 1.3.0
+Rationale: Expanded the Continuous Integration gate to require automated security & quality
+scanning in the pipeline — dependency/SAST/secret scanning (Semgrep), static-analysis quality
+(SonarCloud), container image vulnerability scanning (Trivy), and a mutation-testing check
+(PIT/Stryker). Materially expanded gate, no core principle redefined → MINOR bump.
+
+----- Prior change (1.1.0 → 1.2.0) -----
+Added two non-negotiable quality gates to "Development Workflow & Quality Gates" — a
 Continuous Integration gate and a Test Coverage gate — and strengthened the Definition of Done
-accordingly. New materially-expanded guidance, no core principle redefined → MINOR bump.
+accordingly.
 
 Sections modified (1.2.0):
   ~ Development Workflow & Quality Gates
@@ -129,7 +135,10 @@ plan's Constitution Check.
 - **Continuous Integration gate**: every pull request MUST pass an automated CI pipeline before
   merge — at minimum: build the backend and frontend, run all automated tests, enforce the coverage
   gate (below), and build the Docker image and smoke-test it (container starts and a health check
-  returns success). These checks MUST be configured as required status checks on protected branches
+  returns success). The pipeline MUST additionally run automated **security & quality scanning** —
+  dependency/SAST/secret scanning (Semgrep), static-analysis quality (SonarCloud), container image
+  vulnerability scanning (Trivy), and a mutation-testing check (PIT for Java, Stryker for the
+  frontend). These checks MUST be configured as required status checks on protected branches
   (`develop`, `main`); a failing pipeline blocks the merge.
 - **Coverage gate**: logic code MUST maintain 100% line and branch coverage — backend via JaCoCo,
   frontend via Vitest — enforced in CI so the build/PR fails below the threshold. A documented,
@@ -152,4 +161,4 @@ for clarifications and wording. All plans and reviews MUST verify compliance wit
 and unjustified complexity is grounds for rejecting a change. Runtime development guidance for the
 coding agent lives in `CLAUDE.md`.
 
-**Version**: 1.2.0 | **Ratified**: 2026-06-28 | **Last Amended**: 2026-06-30
+**Version**: 1.3.0 | **Ratified**: 2026-06-28 | **Last Amended**: 2026-06-30

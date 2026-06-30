@@ -62,8 +62,10 @@ screens are mocked in Figma for approval before implementation.
 
 **Quality harness** (Constitution v1.2.0): GitHub Actions CI on every PR — backend `mvn verify`
 (JaCoCo 100%-logic gate), frontend Vitest 100%-logic gate + build, and a Docker image build + smoke
-test (health check). A backend health endpoint backs the smoke test. Required status checks on
-`develop`/`main`. The harness is built first (Phase 0) before feature work.
+test (health check). A backend health endpoint backs the smoke test. The pipeline also runs
+**security & quality scanning** (Constitution v1.3.0): Semgrep (SAST/SCA/secrets), SonarCloud
+(static-analysis quality), Trivy (image CVEs), and mutation testing (PIT/Stryker). Required status
+checks on `develop`/`main`. The harness is built first (Phase 0) before feature work.
 
 **Constraints**: Provider secrets server-side only (FR-018); per-provider isolation — one failure
 must not block/delay others (FR-010); data strictly scoped per user (FR-016); SQLite single-writer

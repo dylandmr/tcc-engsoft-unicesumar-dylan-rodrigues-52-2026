@@ -47,8 +47,12 @@ projects exist; do the minimal scaffold, then wire the gates.
 - [ ] T070 Configure **branch protection** on `develop` and `main`: require the CI checks (backend, frontend, docker) before merge (GitHub settings / `gh api`)
 - [ ] T072 Build the **design-system foundation**: Tailwind CSS + shadcn/ui (Radix) + Observation Deck design tokens (color/type/space/radius, light + dark) + Framer Motion motion primitives + base components, in `frontend/src/styles/` and `frontend/src/components/ui/`
 - [ ] T073 Write a welcoming root `README.md` (pitch + TCC context, architecture summary, stack, `docker compose up` quickstart, SDD/Spec-Kit note, links to the spec & the issues board, screenshots section)
+- [ ] T074 [P] CI **security gate — Semgrep** (SAST + dependency/SCA + secrets) scanning Java + TS in `.github/workflows/ci.yml`; fail PR on blocking findings (Constitution v1.3.0)
+- [ ] T075 [P] CI **quality gate — SonarCloud** static analysis (Java + React) + quality-gate status in CI (requires SonarCloud token secret) (Constitution v1.3.0)
+- [ ] T076 [P] CI **mutation-testing gate** — PIT (Java, `backend/`) + Stryker (TS, `frontend/`); report mutation score and enforce a minimum threshold (Constitution v1.3.0)
+- [ ] T077 [P] CI **container scan — Trivy** of the built image/Dockerfile in the docker job; fail on high/critical CVEs (Constitution v1.3.0)
 
-**Checkpoint**: Design approved, gates live, CI green on a trivial PR — the harness is proven.
+**Checkpoint**: Design approved, all gates live (coverage + Semgrep + SonarCloud + mutation + Trivy + docker smoke), CI green on a trivial PR — the harness is proven.
 
 ---
 
