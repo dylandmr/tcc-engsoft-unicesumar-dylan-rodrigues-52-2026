@@ -1,27 +1,37 @@
 <!--
 Sync Impact Report
 ==================
-Version change: (template) → 1.0.0
-Rationale: Initial ratification of the Prompt Arena constitution (MINOR/MAJOR n/a; first adoption → 1.0.0).
+Version change: 1.0.0 → 1.1.0
+Rationale: Materially revised two sections to match the authoritative TCC document
+(docs/DYLAN RODRIGUES - ATIVIDADE 1 ... 52_2026.pdf). No core principle was added, removed, or
+redefined, so this is a MINOR bump.
 
-Principles defined:
+Principles (unchanged):
   I.   Spec-Driven Development
   II.  Provider Abstraction & Parallel Isolation
   III. Test Discipline for Integrations
   IV.  Security & Secrets Management
   V.   Simplicity & Solo-Maintainability (YAGNI)
 
-Sections:
-  Added: Technology & Architecture Constraints
-  Added: Development Workflow & Quality Gates
-  Added: Governance
+Sections modified:
+  ~ Technology & Architecture Constraints
+      - Frontend tooling corrected: "React with Node.js/Express tooling" → React SPA bundled with Vite
+      - Persistence corrected: NoSQL document DB (MongoDB/DocumentDB) → SQLite (embedded relational)
+      - Deployment corrected: cloud (AWS/GCP) + public domain → Docker for reproducible LOCAL
+        execution (`docker compose up`); source/specs in a public GitHub repository
+      - Backend clarified: Spring Boot REST API records each provider's response time
+  ~ Development Workflow & Quality Gates
+      - Methodology corrected: Scrum/monthly sprints + Trello Kanban → agile, iterative agentic
+        coding with Claude Code, organized via Spec-Driven Development (GitHub Spec Kit)
+      - Validation corrected: peer review/System Demo with family/friends → incremental internal
+        review via direct access at the end of each specification/implementation cycle
 
 Templates reviewed for alignment:
-  ✅ .specify/templates/plan-template.md  (Constitution Check gate compatible)
+  ✅ .specify/templates/plan-template.md  (Constitution Check gate compatible; no stack hardcoded)
   ✅ .specify/templates/spec-template.md  (no mandatory section changes required)
-  ✅ .specify/templates/tasks-template.md (principle-driven task types covered)
+  ✅ .specify/templates/tasks-template.md (principle-driven task types still covered)
 
-Follow-up TODOs: none. RATIFICATION_DATE set to first adoption date (2026-06-28).
+Follow-up TODOs: none. RATIFICATION_DATE unchanged (2026-06-28); LAST_AMENDED_DATE → 2026-06-29.
 -->
 
 # Prompt Arena Constitution
@@ -75,26 +85,36 @@ service accidental complexity.
 The approved stack is authoritative; deviations require a documented justification in the relevant
 plan's Constitution Check.
 
-- **Frontend**: React with Node.js/Express tooling, served as a single-page comparison interface.
-- **Backend**: Java Spring Boot as the core routing engine, integrating provider SDKs.
-- **Persistence**: NoSQL document database (MongoDB or Amazon DocumentDB) for authentication data
-  and prompt/response history.
-- **Deployment**: Containerized for cloud hosting (AWS or GCP) and published to a public domain.
+- **Frontend**: React, built as a Single Page Application (SPA) and bundled with Vite, serving the
+  single-page comparison interface.
+- **Backend**: Java Spring Boot as the core routing engine, exposing a REST API that centralizes
+  session control, integrates the provider SDKs, dispatches the prompt to providers in parallel and
+  isolated, and records each provider's response time.
+- **Persistence**: SQLite, a lightweight embedded relational database, for authentication data and
+  prompt/response history; suited to the local-prototype nature of the project.
+- **Deployment**: Containerized with Docker for a reproducible local execution environment,
+  launchable with a single command (`docker compose up`). This is a local prototype, not a
+  cloud-hosted service; source code and the Spec-Kit specifications are kept in a public GitHub
+  repository.
 - **Scope ceiling**: minimal user/password authentication, parallel execution of up to four
   providers per prompt, and a history view. Anything beyond this is out of scope unless added to the
   product specification first.
 
 ## Development Workflow & Quality Gates
 
-- **Methodology**: Agile via Scrum with monthly sprints; Kanban tracking on Trello. Validation is
-  performed through peer review/System Demo with family, friends, or colleagues.
+- **Methodology**: an agile, iterative approach centered on agentic coding, in which the developer
+  collaborates with AI agents (Claude Code by Anthropic) to specify, plan, implement, and review the
+  software, organized via Spec-Driven Development supported by GitHub Spec Kit (constitution →
+  specify → plan → tasks → implement). No code is written before a reviewed and approved spec.
 - **Spec-Kit gates**: a feature is "ready to implement" only after `/speckit-plan` and
   `/speckit-tasks`; `/speckit-analyze` SHOULD be run before `/speckit-implement` for non-trivial
   features.
 - **Constitution Check**: every plan MUST pass the Constitution Check section; any violation MUST be
   recorded with explicit justification or the design MUST be revised.
+- **Validation**: performed incrementally via direct access to the running local prototype and
+  internal reviews at the end of each specification/implementation cycle.
 - **Definition of done**: spec satisfied, automated tests for affected integrations passing, secrets
-  kept out of version control, and behavior validated in a peer review or demo.
+  kept out of version control, and behavior validated through direct access and internal review.
 
 ## Governance
 
@@ -106,4 +126,4 @@ for clarifications and wording. All plans and reviews MUST verify compliance wit
 and unjustified complexity is grounds for rejecting a change. Runtime development guidance for the
 coding agent lives in `CLAUDE.md`.
 
-**Version**: 1.0.0 | **Ratified**: 2026-06-28 | **Last Amended**: 2026-06-28
+**Version**: 1.1.0 | **Ratified**: 2026-06-28 | **Last Amended**: 2026-06-29
