@@ -3,15 +3,23 @@ package com.promptarena.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
- * Minimal security wiring for the harness milestone. The health and actuator-health endpoints are
- * public so the CI smoke test can reach them; everything else requires authentication.
+ * Security wiring for US1/US2. Health/actuator-health and the bundled SPA's static assets are
+ * public; every API route requires authentication and is scoped to the current user (FR-001,
+ * FR-016).
  *
- * <p>Session-based login/logout, CSRF, and BCrypt are added with the authentication story (US3 /
- * tasks T012, T046, T047). CSRF is temporarily disabled until that wiring lands.
+ * <p><strong>Auth-for-now:</strong> the comparison endpoints are reachable via <em>HTTP Basic</em>
+ * against the seeded demo user (see {@link DataSeeder}), authenticated through
+ * {@code PromptArenaUserDetailsService} + {@link #passwordEncoder()}. This is deliberately minimal
+ * so US1 can be built and tested behind an authenticated session. <strong>US3 replaces HTTP Basic
+ * with session-cookie login/logout and re-enables CSRF on state-changing POSTs</strong> (the SSE
+ * GET stays CSRF-exempt because {@code EventSource} cannot set headers).
  */
 @Configuration
 public class SecurityConfig {
@@ -35,7 +43,14 @@ public class SecurityConfig {
                     .permitAll()
                     .anyRequest()
                     .authenticated())
+        .httpBasic(Customizer.withDefaults())
+        // CSRF stays disabled while auth is HTTP Basic; US3 re-enables it for the session POSTs.
         .csrf(csrf -> csrf.disable());
     return http.build();
+  }
+
+  @Bean
+  PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
   }
 }

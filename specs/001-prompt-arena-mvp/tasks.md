@@ -45,7 +45,7 @@ projects exist; do the minimal scaffold, then wire the gates.
 - [X] T068 [P] GitHub Actions CI — **frontend job**: Node 22, `npm ci`, `npm run test:coverage` (Vitest gate), `npm run build`
 - [X] T069 GitHub Actions CI — **docker job**: build the image, `docker compose up`, poll the health endpoint and assert 200 (proves the image runs remotely)
 - [X] T070 Configure **branch protection** on `develop` and `main`: require the CI checks (backend, frontend, docker) before merge (GitHub settings / `gh api`)
-- [ ] T072 Build the **design-system foundation**: Tailwind CSS + shadcn/ui (Radix) + Observation Deck design tokens (color/type/space/radius, light + dark) + Framer Motion motion primitives + base components, in `frontend/src/styles/` and `frontend/src/components/ui/`. **Apply the design-review sharpening here (carried over from Figma):** (a) per-lane telemetry footer pinned to the bottom (token count + copy) with fuller responses so lanes don't read empty; (b) a "first to respond" badge on the fastest lane; (c) an ambient radial-glow backdrop on Login/Composer so they aren't floating in void; (d) the signature motion — an orchestrated launch sequence on Run, streaming token reveal per lane, and latency counting up live (this is where the "arena" distinctiveness lands)
+- [X] T072 Build the **design-system foundation**: Tailwind CSS + shadcn/ui (Radix) + Observation Deck design tokens (color/type/space/radius, light + dark) + Framer Motion motion primitives + base components, in `frontend/src/styles/` and `frontend/src/components/ui/`. **Apply the design-review sharpening here (carried over from Figma):** (a) per-lane telemetry footer pinned to the bottom (token count + copy) with fuller responses so lanes don't read empty; (b) a "first to respond" badge on the fastest lane; (c) an ambient radial-glow backdrop on Login/Composer so they aren't floating in void; (d) the signature motion — an orchestrated launch sequence on Run, streaming token reveal per lane, and latency counting up live (this is where the "arena" distinctiveness lands)
 - [X] T073 Write a welcoming root `README.md` (pitch + TCC context, architecture summary, stack, `docker compose up` quickstart, SDD/Spec-Kit note, links to the spec & the issues board, screenshots section)
 - [X] T074 [P] CI **security gate — Semgrep** (SAST + dependency/SCA + secrets) scanning Java + TS in `.github/workflows/ci.yml`; fail PR on blocking findings (Constitution v1.3.0)
 - [~] T075 [P] CI **quality gate — SonarCloud** static analysis (Java + React) + quality-gate status in CI (requires SonarCloud token secret) (Constitution v1.3.0)
@@ -62,7 +62,7 @@ projects exist; do the minimal scaffold, then wire the gates.
 
 - [X] T001 Create monorepo structure (`backend/`, `frontend/`, root `docker-compose.yml`, `.env.example`) per plan.md
 - [X] T002 Initialize Spring Boot 3.x backend (Maven, Java 21) in `backend/pom.xml` with web, security, validation, data-jpa starters — scaffolded via Spring Initializr (web, security, validation, data-jpa, actuator) + Maven Wrapper; compiles clean
-- [ ] T003 [P] Add provider + infra dependencies to `backend/pom.xml` (`com.openai:openai-java`, `com.anthropic:anthropic-java`, `com.google.genai:google-genai`, `org.xerial:sqlite-jdbc`, `org.hibernate.orm:hibernate-community-dialects`, WireMock, JUnit 5, Mockito)
+- [X] T003 [P] Add provider + infra dependencies to `backend/pom.xml` (`com.openai:openai-java`, `com.anthropic:anthropic-java`, `com.google.genai:google-genai`, `org.xerial:sqlite-jdbc`, `org.hibernate.orm:hibernate-community-dialects`, WireMock, JUnit 5, Mockito)
 - [X] T004 [P] Initialize React 18 + Vite + TypeScript app in `frontend/` (`package.json`, `vite.config.ts`, Vitest + React Testing Library + MSW dev deps) — scaffolded via create-vite react-ts; deps installed (Vitest/RTL/MSW added in a later step)
 - [ ] T005 [P] Configure backend formatting (Spotless) and frontend ESLint + Prettier configs
 - [X] T006 [P] Create `.env.example` documenting provider key vars (OPENAI/ANTHROPIC/GOOGLE/XAI/DEEPSEEK) and confirm `.env`, `data/`, `*.db` are in `.gitignore`
@@ -81,12 +81,12 @@ projects exist; do the minimal scaffold, then wire the gates.
 - [X] T010 [P] Create JPA entity `ProviderResult` + `Provider`/`Outcome` enums (provider, outcome, responseText, errorMessage, responseTimeMs; unique (comparison, provider)) in `backend/src/main/java/com/promptarena/model/`
 - [X] T011 [P] Create Spring Data repositories `UserRepository`, `ComparisonRepository` in `backend/src/main/java/com/promptarena/repository/`
 - [ ] T012 Configure Spring Security session auth (BCryptPasswordEncoder, protected routes, CSRF for state-changing requests) in `backend/src/main/java/com/promptarena/config/SecurityConfig.java`
-- [ ] T013 Seed a demo user at startup (CommandLineRunner) in `backend/src/main/java/com/promptarena/config/DataSeeder.java`
+- [X] T013 Seed a demo user at startup (CommandLineRunner) in `backend/src/main/java/com/promptarena/config/DataSeeder.java`
 - [X] T014 [P] Define uniform `LlmProvider` interface + `PromptRequest`/`ProviderResult` DTOs (no SDK types leak) in `backend/src/main/java/com/promptarena/provider/LlmProvider.java`
 - [X] T015 [P] Configure virtual-thread executor bean in `backend/src/main/java/com/promptarena/config/ConcurrencyConfig.java`
-- [ ] T016 [P] Add global REST error handling (`@RestControllerAdvice`) with machine-readable error codes in `backend/src/main/java/com/promptarena/config/ApiExceptionHandler.java`
-- [ ] T017 [P] Scaffold frontend routing + protected-route guard + session context in `frontend/src/App.tsx` and `frontend/src/auth/`
-- [ ] T018 [P] Create frontend REST client + SSE (`EventSource`) helper in `frontend/src/api/`
+- [X] T016 [P] Add global REST error handling (`@RestControllerAdvice`) with machine-readable error codes in `backend/src/main/java/com/promptarena/config/ApiExceptionHandler.java`
+- [X] T017 [P] Scaffold frontend routing + protected-route guard + session context in `frontend/src/App.tsx` and `frontend/src/auth/`
+- [X] T018 [P] Create frontend REST client + SSE (`EventSource`) helper in `frontend/src/api/`
 
 **Checkpoint**: Foundation ready — user story implementation can now begin
 
@@ -102,25 +102,25 @@ that each fills as its provider responds (fast before slow).
 
 ### Tests for User Story 1 ⚠️ (write first, ensure they fail)
 
-- [ ] T019 [P] [US1] WireMock contract test for OpenAI-compatible adapter (success + empty) in `backend/src/test/java/com/promptarena/provider/openai/OpenAiCompatibleProviderTest.java`
-- [ ] T020 [P] [US1] WireMock contract test for Anthropic adapter in `backend/src/test/java/com/promptarena/provider/anthropic/AnthropicProviderTest.java`
-- [ ] T021 [P] [US1] WireMock contract test for Google GenAI adapter in `backend/src/test/java/com/promptarena/provider/google/GeminiProviderTest.java`
-- [ ] T022 [P] [US1] Orchestrator fan-out test (parallel dispatch, all succeed, results matched to providers) with Mockito in `backend/src/test/java/com/promptarena/comparison/ComparisonServiceTest.java`
-- [ ] T023 [P] [US1] Frontend test: results render one panel per provider and fill independently (Vitest + RTL + MSW SSE) in `frontend/src/__tests__/Results.test.tsx`
+- [X] T019 [P] [US1] WireMock contract test for OpenAI-compatible adapter (success + empty) in `backend/src/test/java/com/promptarena/provider/openai/OpenAiCompatibleProviderTest.java`
+- [X] T020 [P] [US1] WireMock contract test for Anthropic adapter in `backend/src/test/java/com/promptarena/provider/anthropic/AnthropicProviderTest.java`
+- [X] T021 [P] [US1] WireMock contract test for Google GenAI adapter in `backend/src/test/java/com/promptarena/provider/google/GeminiProviderTest.java`
+- [X] T022 [P] [US1] Orchestrator fan-out test (parallel dispatch, all succeed, results matched to providers) with Mockito in `backend/src/test/java/com/promptarena/comparison/ComparisonServiceTest.java`
+- [X] T023 [P] [US1] Frontend test: results render one panel per provider and fill independently (Vitest + RTL + MSW SSE) in `frontend/src/__tests__/Results.test.tsx`
 
 ### Implementation for User Story 1
 
-- [ ] T024 [P] [US1] Implement OpenAI-compatible adapter (reused for ChatGPT/Grok/DeepSeek via base URL) in `backend/src/main/java/com/promptarena/provider/openai/OpenAiCompatibleProvider.java`
-- [ ] T025 [P] [US1] Implement Anthropic adapter in `backend/src/main/java/com/promptarena/provider/anthropic/AnthropicProvider.java`
-- [ ] T026 [P] [US1] Implement Google GenAI adapter in `backend/src/main/java/com/promptarena/provider/google/GeminiProvider.java`
-- [ ] T027 [US1] Implement provider registry/factory mapping `Provider` enum → `LlmProvider`, reading `{base URL, API key, model id}` per provider from env (`*_MODEL` with defaults) in `backend/src/main/java/com/promptarena/provider/ProviderRegistry.java` (depends on T024–T026)
-- [ ] T028 [US1] Implement fan-out orchestrator (`CompletableFuture.supplyAsync` over virtual-thread executor, `orTimeout` then `exceptionally`) and capture per-provider `response_time_ms` in `backend/src/main/java/com/promptarena/comparison/ComparisonService.java` (depends on T027)
-- [ ] T029 [US1] Implement `POST /api/comparisons` — validate (non-empty prompt ≤ `MAX_PROMPT_LEN`, 1–4 providers, no duplicates, known providers), **persist the comparison as PENDING and return its id without dispatching providers** — in `backend/src/main/java/com/promptarena/comparison/ComparisonController.java`
-- [ ] T030 [US1] Implement `GET /api/comparisons/{id}/stream` SSE emitter that **triggers the fan-out on subscription when PENDING, or replays persisted results when COMPLETE**, pushing `result`/`done` events per provider, in `backend/src/main/java/com/promptarena/comparison/ComparisonStreamController.java`
-- [ ] T031 [P] [US1] Build `PromptInput` + `ProviderPicker` (enforce max 4, no duplicates) components in `frontend/src/components/`
-- [ ] T032 [P] [US1] Build `ProviderPanel` + Results view consuming the SSE stream in `frontend/src/pages/Results.tsx`
-- [ ] T033 [US1] Wire Comparison page (submit → create → open SSE → route events to panels) in `frontend/src/pages/Comparison.tsx` (depends on T031, T032)
-- [ ] T034 [US1] Add client + server validation messages (empty prompt, no providers, >4, duplicate) surfaced in UI
+- [X] T024 [P] [US1] Implement OpenAI-compatible adapter (reused for ChatGPT/Grok/DeepSeek via base URL) in `backend/src/main/java/com/promptarena/provider/openai/OpenAiCompatibleProvider.java`
+- [X] T025 [P] [US1] Implement Anthropic adapter in `backend/src/main/java/com/promptarena/provider/anthropic/AnthropicProvider.java`
+- [X] T026 [P] [US1] Implement Google GenAI adapter in `backend/src/main/java/com/promptarena/provider/google/GeminiProvider.java`
+- [X] T027 [US1] Implement provider registry/factory mapping `Provider` enum → `LlmProvider`, reading `{base URL, API key, model id}` per provider from env (`*_MODEL` with defaults) in `backend/src/main/java/com/promptarena/provider/ProviderRegistry.java` (depends on T024–T026)
+- [X] T028 [US1] Implement fan-out orchestrator (`CompletableFuture.supplyAsync` over virtual-thread executor, `orTimeout` then `exceptionally`) and capture per-provider `response_time_ms` in `backend/src/main/java/com/promptarena/comparison/ComparisonService.java` (depends on T027)
+- [X] T029 [US1] Implement `POST /api/comparisons` — validate (non-empty prompt ≤ `MAX_PROMPT_LEN`, 1–4 providers, no duplicates, known providers), **persist the comparison as PENDING and return its id without dispatching providers** — in `backend/src/main/java/com/promptarena/comparison/ComparisonController.java`
+- [X] T030 [US1] Implement `GET /api/comparisons/{id}/stream` SSE emitter that **triggers the fan-out on subscription when PENDING, or replays persisted results when COMPLETE**, pushing `result`/`done` events per provider, in `backend/src/main/java/com/promptarena/comparison/ComparisonStreamController.java`
+- [X] T031 [P] [US1] Build `PromptInput` + `ProviderPicker` (enforce max 4, no duplicates) components in `frontend/src/components/`
+- [X] T032 [P] [US1] Build `ProviderPanel` + Results view consuming the SSE stream in `frontend/src/pages/Results.tsx`
+- [X] T033 [US1] Wire Comparison page (submit → create → open SSE → route events to panels) in `frontend/src/pages/Comparison.tsx` (depends on T031, T032)
+- [X] T034 [US1] Add client + server validation messages (empty prompt, no providers, >4, duplicate) surfaced in UI
 
 **Checkpoint**: Core side-by-side comparison works end-to-end behind the seeded session.
 
@@ -137,17 +137,17 @@ each panel errors independently.
 
 ### Tests for User Story 2 ⚠️ (write first, ensure they fail)
 
-- [ ] T035 [P] [US2] Isolation test: one provider errors, others still succeed (Mockito orchestrator) in `backend/src/test/java/com/promptarena/comparison/IsolationTest.java`
-- [ ] T036 [P] [US2] Timeout test: one provider exceeds `PROVIDER_TIMEOUT_MS` → `TIMEOUT`, others unaffected (WireMock fixed delay) in `backend/src/test/java/com/promptarena/comparison/TimeoutTest.java`
-- [ ] T037 [P] [US2] All-providers-fail test: each panel gets its own error; request is not a single catastrophic failure in `backend/src/test/java/com/promptarena/comparison/AllFailTest.java`
-- [ ] T038 [P] [US2] Frontend test: error, timeout, and empty panel states render distinctly from success in `frontend/src/__tests__/ProviderPanel.test.tsx`
+- [X] T035 [P] [US2] Isolation test: one provider errors, others still succeed (Mockito orchestrator) in `backend/src/test/java/com/promptarena/comparison/IsolationTest.java`
+- [X] T036 [P] [US2] Timeout test: one provider exceeds `PROVIDER_TIMEOUT_MS` → `TIMEOUT`, others unaffected (WireMock fixed delay) in `backend/src/test/java/com/promptarena/comparison/TimeoutTest.java`
+- [X] T037 [P] [US2] All-providers-fail test: each panel gets its own error; request is not a single catastrophic failure in `backend/src/test/java/com/promptarena/comparison/AllFailTest.java`
+- [X] T038 [P] [US2] Frontend test: error, timeout, and empty panel states render distinctly from success in `frontend/src/__tests__/ProviderPanel.test.tsx`
 
 ### Implementation for User Story 2
 
-- [ ] T039 [US2] Add per-provider timeout config (`PROVIDER_TIMEOUT_MS`) and apply `orTimeout` per future in `backend/src/main/java/com/promptarena/comparison/ComparisonService.java`
-- [ ] T040 [US2] Implement outcome classification (SUCCESS/EMPTY/ERROR/TIMEOUT) + exception→error-code mapping in `backend/src/main/java/com/promptarena/provider/ProviderResultMapper.java`
-- [ ] T041 [P] [US2] Render distinct panel states (error, timeout, empty vs success) in `frontend/src/components/ProviderPanel.tsx`
-- [ ] T042 [US2] Ensure SSE emits each provider's `result`/error event without aborting the stream on any provider failure in `backend/src/main/java/com/promptarena/comparison/ComparisonStreamController.java`
+- [X] T039 [US2] Add per-provider timeout config (`PROVIDER_TIMEOUT_MS`) and apply `orTimeout` per future in `backend/src/main/java/com/promptarena/comparison/ComparisonService.java`
+- [X] T040 [US2] Implement outcome classification (SUCCESS/EMPTY/ERROR/TIMEOUT) + exception→error-code mapping in `backend/src/main/java/com/promptarena/provider/ProviderResultMapper.java`
+- [X] T041 [P] [US2] Render distinct panel states (error, timeout, empty vs success) in `frontend/src/components/ProviderPanel.tsx`
+- [X] T042 [US2] Ensure SSE emits each provider's `result`/error event without aborting the stream on any provider failure in `backend/src/main/java/com/promptarena/comparison/ComparisonStreamController.java`
 
 **Checkpoint**: Partial failures are isolated and visible; core resilience requirement met.
 

@@ -1,0 +1,39 @@
+/** The five supported providers, matching the API contract enum exactly. */
+export type ProviderId = 'GEMINI' | 'CHATGPT' | 'CLAUDE' | 'GROK' | 'DEEPSEEK'
+
+/** Per-provider outcome states from the SSE `result` event. */
+export type Outcome = 'SUCCESS' | 'EMPTY' | 'ERROR' | 'TIMEOUT'
+
+/** Payload of an SSE `result` event (contract: rest-api.md). */
+export interface ProviderResult {
+  provider: ProviderId
+  outcome: Outcome
+  responseText: string | null
+  errorMessage: string | null
+  responseTimeMs: number | null
+}
+
+/** Payload of the SSE `done` event. */
+export interface DoneEvent {
+  comparisonId: string
+  completed: number
+}
+
+/** Response of POST /api/comparisons. */
+export interface CreatedComparison {
+  comparisonId: string
+  providers: ProviderId[]
+}
+
+/** A summary row from GET /api/comparisons. */
+export interface ComparisonSummary {
+  id: string
+  prompt: string
+  providers: ProviderId[]
+  createdAt: string
+}
+
+/** The signed-in user. */
+export interface User {
+  username: string
+}

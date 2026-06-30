@@ -1,10 +1,13 @@
 package com.promptarena.model;
 
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -33,6 +36,19 @@ public class Comparison {
   @Column(nullable = false)
   private Status status = Status.PENDING;
 
+  /**
+   * The providers selected for this comparison, persisted on {@code POST} while the comparison is
+   * still {@link Status#PENDING} (before any {@link ProviderResult} exists). This is the source of
+   * truth for "which providers" the lazy fan-out should dispatch to when the stream is opened.
+   */
+  @ElementCollection(fetch = FetchType.EAGER)
+  @CollectionTable(
+      name = "comparison_providers",
+      joinColumns = @JoinColumn(name = "comparison_id"))
+  @Enumerated(EnumType.STRING)
+  @Column(name = "provider", nullable = false)
+  private List<Provider> providers = new ArrayList<>();
+
   @Column(nullable = false)
   private Instant createdAt = Instant.now();
 
@@ -46,6 +62,12 @@ public class Comparison {
   public Comparison(User user, String prompt) {
     this.user = user;
     this.prompt = prompt;
+  }
+
+  public Comparison(User user, String prompt, List<Provider> providers) {
+    this.user = user;
+    this.prompt = prompt;
+    this.providers = new ArrayList<>(providers);
   }
 
   public void addResult(ProviderResult result) {
@@ -71,6 +93,10 @@ public class Comparison {
 
   public Status getStatus() {
     return status;
+  }
+
+  public List<Provider> getProviders() {
+    return providers;
   }
 
   public Instant getCreatedAt() {

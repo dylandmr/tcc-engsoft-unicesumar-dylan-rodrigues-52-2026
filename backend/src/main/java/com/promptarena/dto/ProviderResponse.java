@@ -9,4 +9,4 @@ import com.promptarena.model.Provider;
  * classification (SUCCESS vs EMPTY vs ERROR vs TIMEOUT) is performed by the orchestrator/mapper.
  */
 public record ProviderResponse(
-    Provider provider, Outcome outcome, String text, String errorMessage, long responseTimeMs) {}
+    Provider provider, Outcome outcome, String text, String errorMessage, Long responseTimeMs) {}
