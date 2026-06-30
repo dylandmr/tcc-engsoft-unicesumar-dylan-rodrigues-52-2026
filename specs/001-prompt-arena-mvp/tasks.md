@@ -46,7 +46,7 @@ projects exist; do the minimal scaffold, then wire the gates.
 - [ ] T069 GitHub Actions CI — **docker job**: build the image, `docker compose up`, poll the health endpoint and assert 200 (proves the image runs remotely)
 - [ ] T070 Configure **branch protection** on `develop` and `main`: require the CI checks (backend, frontend, docker) before merge (GitHub settings / `gh api`)
 - [ ] T072 Build the **design-system foundation**: Tailwind CSS + shadcn/ui (Radix) + Observation Deck design tokens (color/type/space/radius, light + dark) + Framer Motion motion primitives + base components, in `frontend/src/styles/` and `frontend/src/components/ui/`. **Apply the design-review sharpening here (carried over from Figma):** (a) per-lane telemetry footer pinned to the bottom (token count + copy) with fuller responses so lanes don't read empty; (b) a "first to respond" badge on the fastest lane; (c) an ambient radial-glow backdrop on Login/Composer so they aren't floating in void; (d) the signature motion — an orchestrated launch sequence on Run, streaming token reveal per lane, and latency counting up live (this is where the "arena" distinctiveness lands)
-- [ ] T073 Write a welcoming root `README.md` (pitch + TCC context, architecture summary, stack, `docker compose up` quickstart, SDD/Spec-Kit note, links to the spec & the issues board, screenshots section)
+- [X] T073 Write a welcoming root `README.md` (pitch + TCC context, architecture summary, stack, `docker compose up` quickstart, SDD/Spec-Kit note, links to the spec & the issues board, screenshots section)
 - [ ] T074 [P] CI **security gate — Semgrep** (SAST + dependency/SCA + secrets) scanning Java + TS in `.github/workflows/ci.yml`; fail PR on blocking findings (Constitution v1.3.0)
 - [ ] T075 [P] CI **quality gate — SonarCloud** static analysis (Java + React) + quality-gate status in CI (requires SonarCloud token secret) (Constitution v1.3.0)
 - [ ] T076 [P] CI **mutation-testing gate** — PIT (Java, `backend/`) + Stryker (TS, `frontend/`); report mutation score and enforce a minimum threshold (Constitution v1.3.0)
@@ -60,7 +60,7 @@ projects exist; do the minimal scaffold, then wire the gates.
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Create monorepo structure (`backend/`, `frontend/`, root `docker-compose.yml`, `.env.example`) per plan.md
+- [X] T001 Create monorepo structure (`backend/`, `frontend/`, root `docker-compose.yml`, `.env.example`) per plan.md
 - [X] T002 Initialize Spring Boot 3.x backend (Maven, Java 21) in `backend/pom.xml` with web, security, validation, data-jpa starters — scaffolded via Spring Initializr (web, security, validation, data-jpa, actuator) + Maven Wrapper; compiles clean
 - [ ] T003 [P] Add provider + infra dependencies to `backend/pom.xml` (`com.openai:openai-java`, `com.anthropic:anthropic-java`, `com.google.genai:google-genai`, `org.xerial:sqlite-jdbc`, `org.hibernate.orm:hibernate-community-dialects`, WireMock, JUnit 5, Mockito)
 - [X] T004 [P] Initialize React 18 + Vite + TypeScript app in `frontend/` (`package.json`, `vite.config.ts`, Vitest + React Testing Library + MSW dev deps) — scaffolded via create-vite react-ts; deps installed (Vitest/RTL/MSW added in a later step)
