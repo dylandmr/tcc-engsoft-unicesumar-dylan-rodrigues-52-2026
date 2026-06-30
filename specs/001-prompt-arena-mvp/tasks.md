@@ -188,16 +188,16 @@ a second user sees an empty state and never the first user's data.
 
 ### Tests for User Story 4 ⚠️ (write first, ensure they fail)
 
-- [ ] T050 [P] [US4] History scoping test: a user sees only their own comparisons (0 cross-user leakage) in `backend/src/test/java/com/promptarena/history/HistoryScopingTest.java`
-- [ ] T051 [P] [US4] Persistence test: a completed comparison is saved including failed-provider outcomes in `backend/src/test/java/com/promptarena/history/PersistenceTest.java`
-- [ ] T052 [P] [US4] Frontend test: history list and empty state render correctly in `frontend/src/__tests__/History.test.tsx`
+- [X] T050 [P] [US4] History scoping test: a user sees only their own comparisons (0 cross-user leakage) in `backend/src/test/java/com/promptarena/history/HistoryScopingTest.java` — list-scoping + cross-user 404 + empty-list cases
+- [X] T051 [P] [US4] Persistence test: a completed comparison is saved including failed-provider outcomes in `backend/src/test/java/com/promptarena/history/PersistenceTest.java` — drives the real fan-out→persist path (`@MockitoBean` registry: 1 success + 1 failure) and asserts both outcomes saved + `status=COMPLETE`
+- [X] T052 [P] [US4] Frontend test: history list and empty state render correctly in `frontend/src/pages/HistoryPage.test.tsx` (list, empty, error, reopen, sign-out)
 
 ### Implementation for User Story 4
 
-- [ ] T053 [US4] Persist `Comparison` + `ProviderResult`s after fan-out completes via a single writer path and set `status = COMPLETE` in `backend/src/main/java/com/promptarena/comparison/ComparisonService.java`
-- [ ] T054 [US4] Implement `GET /api/comparisons` (list, newest-first, per-user) and `GET /api/comparisons/{id}` (detail; 404 if not owned) in `backend/src/main/java/com/promptarena/history/HistoryController.java`
-- [ ] T055 [P] [US4] Build History list (with empty state) + detail view (showing each provider's response and `response_time_ms`) in `frontend/src/pages/History.tsx`
-- [ ] T056 [US4] Surface per-provider `response_time_ms` (captured in T028) in the comparison detail/history response and view (constitution/TCC requirement)
+- [X] T053 [US4] Persist `Comparison` + `ProviderResult`s after fan-out completes via a single writer path and set `status = COMPLETE` in `backend/src/main/java/com/promptarena/comparison/ComparisonService.java` — `execute()` collects all responses, `addResult` each, `markComplete()`, `save()`; verified by T051
+- [X] T054 [US4] Implement `GET /api/comparisons` (list, newest-first, per-user) and `GET /api/comparisons/{id}` (detail; 404 if not owned) — served by `ComparisonController.list()`/`detail()` via scoped repo queries (`findByUserOrderByCreatedAtDesc`, `findByIdAndUser`); verified by T050 + `ComparisonEndpointTest`
+- [X] T055 [P] [US4] Build History list (with empty state) + detail view (showing each provider's response and `response_time_ms`) in `frontend/src/pages/HistoryPage.tsx` (+ reuses `ResultsPage` for detail/replay)
+- [X] T056 [US4] Surface per-provider `response_time_ms` (captured in T028) in the comparison detail/history response and view — `detail()` maps `responseTimeMs` into each `ResultEvent`; rendered per-lane in the results view
 
 **Checkpoint**: All user stories independently functional.
 
