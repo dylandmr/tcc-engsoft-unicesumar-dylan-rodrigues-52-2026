@@ -105,8 +105,14 @@ flowchart LR
 docker compose up
 ```
 
-Then open <http://localhost:8080>. To exercise live models, copy `.env.example` to `.env` and add the
-provider API keys you have — any provider without a key is simply shown as unavailable.
+Then open <http://localhost:8080> and sign in with **`demo` / `demo1234`**. To exercise live models,
+copy `.env.example` to `.env` and add the provider API keys you have — any provider without a key is
+simply shown as unavailable.
+
+> **New here?** [`docs/LOCAL_SETUP.md`](docs/LOCAL_SETUP.md) is a full step-by-step walkthrough:
+> generating each provider API key (and the optional SonarCloud token), running the app, and
+> validating every feature in the browser. Helper scripts: `scripts/local-up.ps1` (Windows) /
+> `scripts/local-up.sh` (macOS/Linux).
 
 ### Develop locally
 
