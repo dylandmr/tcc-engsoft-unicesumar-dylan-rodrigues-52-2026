@@ -1,6 +1,7 @@
 package com.promptarena.comparison;
 
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -24,7 +25,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
 
-/** End-to-end MockMvc tests for the comparison endpoints (HTTP Basic against the seeded demo user). */
+/** End-to-end MockMvc tests for the comparison endpoints (session auth as the seeded demo user). */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
@@ -36,7 +37,8 @@ class ComparisonEndpointTest {
 
   private MockHttpServletRequestBuilder authedPost(String json) {
     return post("/api/comparisons")
-        .with(httpBasic("demo", "demo1234"))
+        .with(user("demo").roles("USER"))
+        .with(csrf())
         .contentType(MediaType.APPLICATION_JSON)
         .content(json);
   }
@@ -66,14 +68,14 @@ class ComparisonEndpointTest {
     String id = JsonPath.read(response, "$.comparisonId");
 
     mockMvc
-        .perform(get("/api/comparisons/{id}", id).with(httpBasic("demo", "demo1234")))
+        .perform(get("/api/comparisons/{id}", id).with(user("demo").roles("USER")))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.id").value(id))
         .andExpect(jsonPath("$.prompt").value("Explain entanglement"))
         .andExpect(jsonPath("$.results").isArray());
 
     mockMvc
-        .perform(get("/api/comparisons").with(httpBasic("demo", "demo1234")))
+        .perform(get("/api/comparisons").with(user("demo").roles("USER")))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.comparisons[0].id").value(id))
         .andExpect(jsonPath("$.comparisons[0].providers[0]").value("CLAUDE"));
@@ -158,7 +160,7 @@ class ComparisonEndpointTest {
     String id = comparisons.save(comparison).getId();
 
     mockMvc
-        .perform(get("/api/comparisons/{id}", id).with(httpBasic("demo", "demo1234")))
+        .perform(get("/api/comparisons/{id}", id).with(user("demo").roles("USER")))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.results[0].provider").value("CLAUDE"))
         .andExpect(jsonPath("$.results[0].outcome").value("SUCCESS"))
@@ -171,7 +173,7 @@ class ComparisonEndpointTest {
   @Test
   void detailForUnknownComparisonReturns404() throws Exception {
     mockMvc
-        .perform(get("/api/comparisons/{id}", "does-not-exist").with(httpBasic("demo", "demo1234")))
+        .perform(get("/api/comparisons/{id}", "does-not-exist").with(user("demo").roles("USER")))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.error").value("not_found"));
   }

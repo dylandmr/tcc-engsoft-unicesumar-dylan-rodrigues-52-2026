@@ -80,7 +80,7 @@ projects exist; do the minimal scaffold, then wire the gates.
 - [X] T009 [P] Create JPA entity `Comparison` (id, user FK, prompt, `status` PENDING/COMPLETE, createdAt) + `Status` enum in `backend/src/main/java/com/promptarena/model/Comparison.java`
 - [X] T010 [P] Create JPA entity `ProviderResult` + `Provider`/`Outcome` enums (provider, outcome, responseText, errorMessage, responseTimeMs; unique (comparison, provider)) in `backend/src/main/java/com/promptarena/model/`
 - [X] T011 [P] Create Spring Data repositories `UserRepository`, `ComparisonRepository` in `backend/src/main/java/com/promptarena/repository/`
-- [ ] T012 Configure Spring Security session auth (BCryptPasswordEncoder, protected routes, CSRF for state-changing requests) in `backend/src/main/java/com/promptarena/config/SecurityConfig.java`
+- [X] T012 Configure Spring Security session auth (BCryptPasswordEncoder, protected routes, CSRF for state-changing requests) in `backend/src/main/java/com/promptarena/config/SecurityConfig.java` — session cookie + `CookieCsrfTokenRepository` (XSRF-TOKEN) + `CsrfCookieFilter` + REST 401 entry point (replaces HTTP-Basic-for-now); `AuthenticationManager`/`SecurityContextRepository` beans added (US3/T047)
 - [X] T013 Seed a demo user at startup (CommandLineRunner) in `backend/src/main/java/com/promptarena/config/DataSeeder.java`
 - [X] T014 [P] Define uniform `LlmProvider` interface + `PromptRequest`/`ProviderResult` DTOs (no SDK types leak) in `backend/src/main/java/com/promptarena/provider/LlmProvider.java`
 - [X] T015 [P] Configure virtual-thread executor bean in `backend/src/main/java/com/promptarena/config/ConcurrencyConfig.java`
@@ -163,16 +163,16 @@ valid creds → access granted; invalid creds → non-revealing error; sign out 
 
 ### Tests for User Story 3 ⚠️ (write first, ensure they fail)
 
-- [ ] T043 [P] [US3] Auth test: protected endpoints return 401 when unauthenticated in `backend/src/test/java/com/promptarena/auth/ProtectedRouteTest.java`
-- [ ] T044 [P] [US3] Auth test: invalid credentials → non-revealing error; valid login establishes session; logout invalidates in `backend/src/test/java/com/promptarena/auth/AuthFlowTest.java`
-- [ ] T045 [P] [US3] Frontend test: signed-out access redirects to login; login + logout flow works in `frontend/src/__tests__/Login.test.tsx`
+- [X] T043 [P] [US3] Auth test: protected endpoints return 401 when unauthenticated in `backend/src/test/java/com/promptarena/auth/ProtectedRouteTest.java`
+- [X] T044 [P] [US3] Auth test: invalid credentials → non-revealing error; valid login establishes session; logout invalidates in `backend/src/test/java/com/promptarena/auth/AuthFlowTest.java`
+- [X] T045 [P] [US3] Frontend test: signed-out access redirects to login; login + logout flow works in `frontend/src/pages/LoginPage.test.tsx` + `frontend/src/auth/{session,ProtectedRoute}.test.tsx`
 
 ### Implementation for User Story 3
 
-- [ ] T046 [US3] Implement `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` in `backend/src/main/java/com/promptarena/auth/AuthController.java`
-- [ ] T047 [US3] Implement `UserDetailsService` + BCrypt authentication wiring in `backend/src/main/java/com/promptarena/auth/AppUserDetailsService.java`
-- [ ] T048 [P] [US3] Build Login page + form validation in `frontend/src/pages/Login.tsx`
-- [ ] T049 [US3] Wire route guards + session bootstrap (`GET /auth/me`) + logout control in `frontend/src/auth/` and app shell
+- [X] T046 [US3] Implement `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` in `backend/src/main/java/com/promptarena/auth/AuthController.java`
+- [X] T047 [US3] Implement `UserDetailsService` + BCrypt authentication wiring — reused existing `PromptArenaUserDetailsService`; `AuthenticationManager` (DaoAuthenticationProvider + BCrypt) wired in `config/SecurityConfig.java`
+- [X] T048 [P] [US3] Build Login page + form validation in `frontend/src/pages/LoginPage.tsx` (+ `hooks/useLogin`)
+- [X] T049 [US3] Wire route guards + session bootstrap (`GET /auth/me`) + logout control in `frontend/src/auth/` and app shell
 
 **Checkpoint**: Full auth journey works; protected screens enforce sign-in.
 
