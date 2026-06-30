@@ -1,0 +1,49 @@
+name: CI
+
+# Quality gate for every PR into develop/main and every feature push (Constitution v1.2.0+).
+on:
+  push:
+  pull_request:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend · build, test, coverage gate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: mvn verify (tests + JaCoCo 100% gate)
+        run: ./mvnw -B --no-transfer-progress verify
+
+  frontend:
+    name: Frontend · build, test, coverage gate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install deps
+        run: npm ci
+      - name: Test + coverage gate (Vitest 100%)
+        run: npm run test:coverage
+      - name: Build
+        run: npm run build

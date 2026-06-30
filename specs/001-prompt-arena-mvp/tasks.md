@@ -38,11 +38,11 @@ to preserve the existing GitHub issue mapping; this phase still executes **first
 projects exist; do the minimal scaffold, then wire the gates.
 
 - [ ] T071 Mock the 4 screens (login / composer / results-arena / history) in **Figma** in the "Observation Deck" direction; get approval before building UI (design artifact under `design/`)
-- [ ] T064 Add a backend health endpoint (Spring Boot Actuator `/actuator/health` or a trivial `/api/health`) for the CI smoke test, in `backend/src/main/java/com/promptarena/health/`
-- [ ] T065 Configure JaCoCo coverage gate in `backend/pom.xml`: **100% line+branch on logic packages** (`provider`, `comparison`, `auth`, `history`) with a documented exclusion list (`model/*` entities/DTOs, `config/*`, `*Application`); `mvn verify` fails below threshold
-- [ ] T066 Configure Vitest coverage gate in `frontend/vitest.config.ts`: **100% thresholds** on components/hooks/api with exclusions (`*.d.ts`, `main.tsx`, generated); test run fails below threshold
-- [ ] T067 [P] GitHub Actions CI — **backend job** in `.github/workflows/ci.yml`: JDK 21, `mvn verify` (tests + JaCoCo gate)
-- [ ] T068 [P] GitHub Actions CI — **frontend job**: Node 20, `npm ci`, `npm test -- --coverage` (Vitest gate), `npm run build`
+- [X] T064 Add a backend health endpoint (`/api/health` + Actuator `/actuator/health`) for the CI smoke test, in `backend/src/main/java/com/promptarena/health/` — TDD, public via SecurityConfig
+- [X] T065 Configure JaCoCo coverage gate in `backend/pom.xml`: **100% line+branch on logic**, excluding `**/*Application`, `config/**`, `model/**`; `mvnw verify` fails below threshold — verified green
+- [X] T066 Configure Vitest coverage gate in `frontend/vite.config.ts`: **100% thresholds**, excluding `main.tsx`, tests, `*.d.ts` — verified green
+- [X] T067 [P] GitHub Actions CI — **backend job** in `.github/workflows/ci.yml`: JDK 21 (temurin, maven cache), `./mvnw -B verify`
+- [X] T068 [P] GitHub Actions CI — **frontend job**: Node 22, `npm ci`, `npm run test:coverage` (Vitest gate), `npm run build`
 - [ ] T069 GitHub Actions CI — **docker job**: build the image, `docker compose up`, poll the health endpoint and assert 200 (proves the image runs remotely)
 - [ ] T070 Configure **branch protection** on `develop` and `main`: require the CI checks (backend, frontend, docker) before merge (GitHub settings / `gh api`)
 - [ ] T072 Build the **design-system foundation**: Tailwind CSS + shadcn/ui (Radix) + Observation Deck design tokens (color/type/space/radius, light + dark) + Framer Motion motion primitives + base components, in `frontend/src/styles/` and `frontend/src/components/ui/`. **Apply the design-review sharpening here (carried over from Figma):** (a) per-lane telemetry footer pinned to the bottom (token count + copy) with fuller responses so lanes don't read empty; (b) a "first to respond" badge on the fastest lane; (c) an ambient radial-glow backdrop on Login/Composer so they aren't floating in void; (d) the signature motion — an orchestrated launch sequence on Run, streaming token reveal per lane, and latency counting up live (this is where the "arena" distinctiveness lands)
@@ -75,7 +75,7 @@ projects exist; do the minimal scaffold, then wire the gates.
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T007 Configure SQLite datasource + JPA in `backend/src/main/resources/application.properties` (jdbc:sqlite url, `org.sqlite.JDBC`, `SQLiteDialect`, HikariCP `maximum-pool-size=1`, `ddl-auto=update`)
+- [X] T007 Configure SQLite datasource + JPA in `backend/src/main/resources/application.properties` (jdbc:sqlite url, `org.sqlite.JDBC`, `SQLiteDialect`, HikariCP `maximum-pool-size=1`, `ddl-auto=update`) — + in-memory test profile; verified connecting (SQLite 3.50.3). WAL pragma still pending (T059)
 - [ ] T008 [P] Create JPA entity `User` (id, unique username, passwordHash, createdAt) in `backend/src/main/java/com/promptarena/model/User.java`
 - [ ] T009 [P] Create JPA entity `Comparison` (id, user FK, prompt, `status` PENDING/COMPLETE, createdAt) + `Status` enum in `backend/src/main/java/com/promptarena/model/Comparison.java`
 - [ ] T010 [P] Create JPA entity `ProviderResult` + `Provider`/`Outcome` enums (provider, outcome, responseText, errorMessage, responseTimeMs; unique (comparison, provider)) in `backend/src/main/java/com/promptarena/model/`
