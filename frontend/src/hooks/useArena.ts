@@ -24,6 +24,7 @@ export function useArena(
     streamComparison(
       comparisonId,
       {
+        onChunk: (chunk) => dispatch({ type: 'chunk', chunk }),
         onResult: (result) => dispatch({ type: 'result', result }),
         onDone: () => dispatch({ type: 'done' }),
       },

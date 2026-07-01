@@ -65,6 +65,19 @@ describe('arenaReducer', () => {
     expect(s.lanes.CLAUDE.elapsedMs).toBe(300)
   })
 
+  it('appends streamed chunk deltas to the lane text while live', () => {
+    const a = arenaReducer(start, {
+      type: 'chunk',
+      chunk: { provider: 'CLAUDE', delta: 'Hel' },
+    })
+    const b = arenaReducer(a, {
+      type: 'chunk',
+      chunk: { provider: 'CLAUDE', delta: 'lo' },
+    })
+    expect(b.lanes.CLAUDE.text).toBe('Hello')
+    expect(b.lanes.CLAUDE.status).toBe('live')
+  })
+
   it('maps an unconfigured provider to a disabled lane, not an error', () => {
     const s = arenaReducer(start, {
       type: 'result',

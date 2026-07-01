@@ -1,15 +1,20 @@
 package com.promptarena.provider.google;
 
 import com.google.genai.Client;
+import com.google.genai.ResponseStream;
+import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.GenerateContentResponse;
 import com.google.genai.types.HttpOptions;
 import com.google.genai.types.HttpRetryOptions;
+import com.google.genai.types.ThinkingConfig;
 import com.promptarena.dto.PromptRequest;
 import com.promptarena.dto.ProviderResponse;
 import com.promptarena.model.Provider;
 import com.promptarena.provider.LlmProvider;
 import com.promptarena.provider.ProviderResultMapper;
 import java.time.Duration;
+import java.util.Optional;
+import java.util.function.Consumer;
 
 /**
  * Adapter over the official Google GenAI Java SDK (Gemini). No SDK type leaks past this class
@@ -22,6 +27,16 @@ public final class GeminiProvider implements LlmProvider {
   // zero requests on new keys (429 "limit: 0"); 2.5-flash works on the free tier.
   public static final String DEFAULT_MODEL = "gemini-2.5-flash";
   public static final String DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com";
+
+  // Gemini 2.5 models "think" (reason silently) before emitting output, which on longer prompts
+  // delays the first streamed token by many seconds — the response then appears in a late burst
+  // rather than progressively. Disabling thinking (budget 0) makes tokens stream immediately,
+  // giving
+  // the live-chatbot experience; it trades some answer depth for responsiveness.
+  private static final GenerateContentConfig STREAM_CONFIG =
+      GenerateContentConfig.builder()
+          .thinkingConfig(ThinkingConfig.builder().thinkingBudget(0))
+          .build();
 
   private final String model;
   private final Client client;
@@ -47,15 +62,25 @@ public final class GeminiProvider implements LlmProvider {
   }
 
   @Override
-  public ProviderResponse complete(PromptRequest request) {
+  public ProviderResponse stream(PromptRequest request, Consumer<String> onToken) {
     if (client == null) {
       return ProviderResultMapper.error(Provider.GEMINI, "provider_not_configured", null);
     }
     long start = System.nanoTime();
     try {
-      GenerateContentResponse response =
-          client.models.generateContent(model, request.prompt(), null);
-      return ProviderResultMapper.success(Provider.GEMINI, response.text(), elapsedMs(start));
+      StringBuilder full = new StringBuilder();
+      try (ResponseStream<GenerateContentResponse> chunks =
+          client.models.generateContentStream(model, request.prompt(), STREAM_CONFIG)) {
+        for (GenerateContentResponse chunk : chunks) {
+          Optional.ofNullable(chunk.text())
+              .ifPresent(
+                  delta -> {
+                    full.append(delta);
+                    onToken.accept(delta);
+                  });
+        }
+      }
+      return ProviderResultMapper.success(Provider.GEMINI, full.toString(), elapsedMs(start));
     } catch (RuntimeException ex) {
       return ProviderResultMapper.error(Provider.GEMINI, ex.getMessage(), elapsedMs(start));
     }

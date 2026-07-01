@@ -33,6 +33,32 @@ describe('useArena', () => {
     unmount()
   })
 
+  it('accumulates streamed chunk deltas into the lane text', async () => {
+    server.use(
+      http.get('/api/comparisons/:id/stream', () =>
+        sseResponse([
+          { event: 'chunk', data: { provider: 'CLAUDE', delta: 'Hel' } },
+          { event: 'chunk', data: { provider: 'CLAUDE', delta: 'lo' } },
+          {
+            event: 'result',
+            data: {
+              provider: 'CLAUDE',
+              outcome: 'SUCCESS',
+              responseText: 'Hello',
+              errorMessage: null,
+              responseTimeMs: 10,
+            },
+          },
+          { event: 'done', data: { comparisonId: 'c_test', completed: 1 } },
+        ]),
+      ),
+    )
+    const { result, unmount } = renderHook(() => useArena('c_test', ['CLAUDE']))
+    await waitFor(() => expect(result.current.done).toBe(true))
+    expect(result.current.lanes.CLAUDE.text).toBe('Hello')
+    unmount()
+  })
+
   it('marks live lanes as errored when the stream fails', async () => {
     server.use(
       http.get(

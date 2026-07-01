@@ -11,6 +11,8 @@ import com.promptarena.dto.PromptRequest;
 import com.promptarena.dto.ProviderResponse;
 import com.promptarena.model.Outcome;
 import com.promptarena.model.Provider;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,25 +39,38 @@ class GeminiProviderTest {
     return new GeminiProvider(apiKey, "gemini-test", baseUrl);
   }
 
-  private void stubGenerate(int status, String text) {
-    String body =
-        text == null
-            ? "{\"error\":{\"code\":500,\"message\":\"boom\",\"status\":\"INTERNAL\"}}"
-            : "{\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\""
-                + text
-                + "\"}]},\"finishReason\":\"STOP\"}]}";
+  /** A JSON error response — the SDK raises, mapping to ERROR. */
+  private void stubError(int status) {
     server.stubFor(
         post(anyUrl())
             .willReturn(
                 aResponse()
                     .withStatus(status)
                     .withHeader("Content-Type", "application/json")
-                    .withBody(body)));
+                    .withBody(
+                        "{\"error\":{\"code\":500,\"message\":\"boom\",\"status\":\"INTERNAL\"}}")));
+  }
+
+  /** A streaming (SSE) generateContent response delivering the given text deltas in order. */
+  private void stubGenerateStream(String... deltas) {
+    StringBuilder body = new StringBuilder();
+    for (String delta : deltas) {
+      body.append("data: {\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"")
+          .append(delta)
+          .append("\"}]}}]}\n\n");
+    }
+    server.stubFor(
+        post(anyUrl())
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withHeader("Content-Type", "text/event-stream")
+                    .withBody(body.toString())));
   }
 
   @Test
   void successfulResponseIsMappedToSuccess() {
-    stubGenerate(200, "Hello from Gemini");
+    stubGenerateStream("Hello from Gemini");
 
     ProviderResponse response = provider("test-key").complete(new PromptRequest("hi"));
 
@@ -65,8 +80,20 @@ class GeminiProviderTest {
   }
 
   @Test
+  void streamsEachDeltaThenAggregatesTheFullText() {
+    stubGenerateStream("Hello", " from", " Gemini");
+
+    List<String> tokens = new ArrayList<>();
+    ProviderResponse response = provider("test-key").stream(new PromptRequest("hi"), tokens::add);
+
+    assertThat(tokens).containsExactly("Hello", " from", " Gemini");
+    assertThat(response.text()).isEqualTo("Hello from Gemini");
+    assertThat(response.outcome()).isEqualTo(Outcome.SUCCESS);
+  }
+
+  @Test
   void serverErrorIsMappedToError() {
-    stubGenerate(500, null);
+    stubError(500);
 
     ProviderResponse response = provider("test-key").complete(new PromptRequest("hi"));
 

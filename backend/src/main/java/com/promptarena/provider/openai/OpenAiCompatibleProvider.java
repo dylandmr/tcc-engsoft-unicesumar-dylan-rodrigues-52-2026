@@ -2,7 +2,8 @@ package com.promptarena.provider.openai;
 
 import com.openai.client.OpenAIClient;
 import com.openai.client.okhttp.OpenAIOkHttpClient;
-import com.openai.models.chat.completions.ChatCompletion;
+import com.openai.core.http.StreamResponse;
+import com.openai.models.chat.completions.ChatCompletionChunk;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import com.promptarena.dto.PromptRequest;
 import com.promptarena.dto.ProviderResponse;
@@ -10,6 +11,8 @@ import com.promptarena.model.Provider;
 import com.promptarena.provider.LlmProvider;
 import com.promptarena.provider.ProviderResultMapper;
 import java.time.Duration;
+import java.util.Optional;
+import java.util.function.Consumer;
 
 /**
  * Adapter over the OpenAI Java SDK's chat-completions API. Because Grok and DeepSeek are
@@ -54,7 +57,7 @@ public final class OpenAiCompatibleProvider implements LlmProvider {
   }
 
   @Override
-  public ProviderResponse complete(PromptRequest request) {
+  public ProviderResponse stream(PromptRequest request, Consumer<String> onToken) {
     if (client == null) {
       return ProviderResultMapper.error(id, "provider_not_configured", null);
     }
@@ -65,9 +68,20 @@ public final class OpenAiCompatibleProvider implements LlmProvider {
               .model(model)
               .addUserMessage(request.prompt())
               .build();
-      ChatCompletion completion = client.chat().completions().create(params);
-      String text = completion.choices().get(0).message().content().orElse("");
-      return ProviderResultMapper.success(id, text, elapsedMs(start));
+      StringBuilder full = new StringBuilder();
+      try (StreamResponse<ChatCompletionChunk> chunks =
+          client.chat().completions().createStreaming(params)) {
+        chunks.stream()
+            .flatMap(chunk -> chunk.choices().stream())
+            .map(choice -> choice.delta().content())
+            .flatMap(Optional::stream)
+            .forEach(
+                delta -> {
+                  full.append(delta);
+                  onToken.accept(delta);
+                });
+      }
+      return ProviderResultMapper.success(id, full.toString(), elapsedMs(start));
     } catch (RuntimeException ex) {
       return ProviderResultMapper.error(id, ex.getMessage(), elapsedMs(start));
     }

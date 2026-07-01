@@ -1,4 +1,4 @@
-import type { Outcome, ProviderId, ProviderResult } from '../types'
+import type { ChunkEvent, Outcome, ProviderId, ProviderResult } from '../types'
 
 export type LaneStatus =
   'live' | 'done' | 'empty' | 'error' | 'timeout' | 'disabled'
@@ -33,6 +33,7 @@ const OUTCOME_STATUS: Record<Outcome, LaneStatus> = {
 
 export type ArenaAction =
   | { type: 'tick'; elapsedMs: number }
+  | { type: 'chunk'; chunk: ChunkEvent }
   | { type: 'result'; result: ProviderResult }
   | { type: 'streamError' }
   | { type: 'done' }
@@ -83,6 +84,13 @@ export function arenaReducer(
             : lane
       }
       return { ...state, lanes }
+    }
+    case 'chunk': {
+      // Append the streamed delta to the lane's growing text (live token streaming).
+      const { provider, delta } = action.chunk
+      return patchLane(state, provider, {
+        text: state.lanes[provider].text + delta,
+      })
     }
     case 'result': {
       const { provider, outcome, responseText, errorMessage, responseTimeMs } =

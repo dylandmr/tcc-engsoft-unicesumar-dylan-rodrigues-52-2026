@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Executor;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -53,20 +54,23 @@ class ComparisonControllerTest {
   }
 
   @Test
-  void runStreamPendingEmitsResultsThenDone() throws Exception {
+  void runStreamPendingEmitsChunksResultsThenDone() throws Exception {
     Comparison comparison = new Comparison(new User("demo", "h"), "p", List.of(Provider.CLAUDE));
     SseEmitter emitter = mock(SseEmitter.class);
-    when(comparisonService.execute(anyString(), any()))
+    when(comparisonService.execute(anyString(), any(), any()))
         .thenAnswer(
             invocation -> {
-              Consumer<ResultEvent> callback = invocation.getArgument(1);
-              callback.accept(sampleEvent());
+              BiConsumer<Provider, String> onToken = invocation.getArgument(1);
+              Consumer<ResultEvent> onResult = invocation.getArgument(2);
+              onToken.accept(Provider.CLAUDE, "hel");
+              onResult.accept(sampleEvent());
               return 1;
             });
 
     controller().runStream(comparison, emitter);
 
-    verify(emitter, org.mockito.Mockito.times(2)).send(any(SseEmitter.SseEventBuilder.class));
+    // chunk + result + done
+    verify(emitter, org.mockito.Mockito.times(3)).send(any(SseEmitter.SseEventBuilder.class));
     verify(emitter).complete();
   }
 
@@ -90,17 +94,37 @@ class ComparisonControllerTest {
   }
 
   @Test
-  void runStreamCompletesWithErrorWhenSendFails() throws Exception {
+  void runStreamCompletesWithErrorWhenResultSendFails() throws Exception {
     Comparison comparison = new Comparison(new User("demo", "h"), "p", List.of(Provider.CLAUDE));
     SseEmitter emitter = mock(SseEmitter.class);
     doThrow(new IOException("broken pipe"))
         .when(emitter)
         .send(any(SseEmitter.SseEventBuilder.class));
-    when(comparisonService.execute(anyString(), any()))
+    when(comparisonService.execute(anyString(), any(), any()))
         .thenAnswer(
             invocation -> {
-              Consumer<ResultEvent> callback = invocation.getArgument(1);
-              callback.accept(sampleEvent());
+              Consumer<ResultEvent> onResult = invocation.getArgument(2);
+              onResult.accept(sampleEvent());
+              return 1;
+            });
+
+    controller().runStream(comparison, emitter);
+
+    verify(emitter).completeWithError(any());
+  }
+
+  @Test
+  void runStreamCompletesWithErrorWhenChunkSendFails() throws Exception {
+    Comparison comparison = new Comparison(new User("demo", "h"), "p", List.of(Provider.CLAUDE));
+    SseEmitter emitter = mock(SseEmitter.class);
+    doThrow(new IOException("broken pipe"))
+        .when(emitter)
+        .send(any(SseEmitter.SseEventBuilder.class));
+    when(comparisonService.execute(anyString(), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              BiConsumer<Provider, String> onToken = invocation.getArgument(1);
+              onToken.accept(Provider.CLAUDE, "x");
               return 1;
             });
 
@@ -115,12 +139,12 @@ class ComparisonControllerTest {
     Comparison comparison = new Comparison(user, "p", List.of(Provider.CLAUDE));
     when(currentUser.require()).thenReturn(user);
     when(comparisons.findByIdAndUser(comparison.getId(), user)).thenReturn(Optional.of(comparison));
-    when(comparisonService.execute(anyString(), any())).thenReturn(0);
+    when(comparisonService.execute(anyString(), any(), any())).thenReturn(0);
 
     SseEmitter emitter = controller().stream(comparison.getId());
 
     assertThat(emitter).isNotNull();
-    verify(comparisonService).execute(eq(comparison.getId()), any());
+    verify(comparisonService).execute(eq(comparison.getId()), any(), any());
   }
 
   @Test

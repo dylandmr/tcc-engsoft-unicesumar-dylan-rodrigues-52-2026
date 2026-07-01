@@ -3,6 +3,7 @@ package com.promptarena.provider;
 import com.promptarena.dto.PromptRequest;
 import com.promptarena.dto.ProviderResponse;
 import com.promptarena.model.Provider;
+import java.util.function.Consumer;
 
 /**
  * Uniform interface to every LLM provider. Provider-specific SDK details MUST NOT leak past
@@ -14,10 +15,16 @@ public interface LlmProvider {
   Provider id();
 
   /**
-   * Send the prompt to the provider and return its answer. Implementations make a blocking call;
+   * Stream the prompt to the provider, invoking {@code onToken} for each incremental text delta as
+   * it arrives, then returning the final aggregated answer. Implementations make a blocking call;
    * the orchestrator runs them concurrently on virtual threads with per-call timeouts and isolates
-   * failures. Implementations should not throw for provider-side errors — they should be surfaced
-   * by the orchestrator as that provider's own result.
+   * failures. Implementations should not throw for provider-side errors — they surface them as that
+   * provider's own result.
    */
-  ProviderResponse complete(PromptRequest request);
+  ProviderResponse stream(PromptRequest request, Consumer<String> onToken);
+
+  /** Run the call to completion, discarding the intermediate deltas. */
+  default ProviderResponse complete(PromptRequest request) {
+    return stream(request, token -> {});
+  }
 }

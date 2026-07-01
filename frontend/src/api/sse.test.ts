@@ -3,7 +3,7 @@ import { http, HttpResponse, server, sseResponse } from '../../testing/server'
 import { encodeSseEvent } from '../../testing/sse'
 import { ApiError } from './client'
 import { parseBlock, streamComparison } from './sse'
-import type { DoneEvent, ProviderResult } from '../types'
+import type { ChunkEvent, DoneEvent, ProviderResult } from '../types'
 
 describe('parseBlock', () => {
   it('parses an event name and JSON data', () => {
@@ -23,10 +23,11 @@ describe('parseBlock', () => {
 })
 
 describe('streamComparison', () => {
-  it('dispatches result and done events, ignoring unknown events', async () => {
+  it('dispatches chunk, result and done events, ignoring unknown ones', async () => {
     server.use(
       http.get('/api/comparisons/:id/stream', () =>
         sseResponse([
+          { event: 'chunk', data: { provider: 'CLAUDE', delta: 'hi' } },
           {
             event: 'result',
             data: {
@@ -37,17 +38,21 @@ describe('streamComparison', () => {
               responseTimeMs: 100,
             },
           },
-          { event: 'token', data: { provider: 'CLAUDE', chunk: 'x' } },
+          { event: 'ping', data: { keepAlive: true } },
           { event: 'done', data: { comparisonId: 'c1', completed: 1 } },
         ]),
       ),
     )
+    const chunks: ChunkEvent[] = []
     const results: ProviderResult[] = []
     const dones: DoneEvent[] = []
     await streamComparison('c1', {
+      onChunk: (c) => chunks.push(c),
       onResult: (r) => results.push(r),
       onDone: (d) => dones.push(d),
     })
+    expect(chunks).toHaveLength(1)
+    expect(chunks[0].delta).toBe('hi')
     expect(results).toHaveLength(1)
     expect(results[0].provider).toBe('CLAUDE')
     expect(dones[0].completed).toBe(1)
@@ -69,7 +74,11 @@ describe('streamComparison', () => {
       ),
     )
     const onDone = vi.fn()
-    await streamComparison('c1', { onResult: vi.fn(), onDone })
+    await streamComparison('c1', {
+      onChunk: vi.fn(),
+      onResult: vi.fn(),
+      onDone,
+    })
     expect(onDone).toHaveBeenCalledTimes(1)
   })
 
@@ -81,7 +90,11 @@ describe('streamComparison', () => {
       ),
     )
     await expect(
-      streamComparison('missing', { onResult: vi.fn(), onDone: vi.fn() }),
+      streamComparison('missing', {
+        onChunk: vi.fn(),
+        onResult: vi.fn(),
+        onDone: vi.fn(),
+      }),
     ).rejects.toBeInstanceOf(ApiError)
   })
 })

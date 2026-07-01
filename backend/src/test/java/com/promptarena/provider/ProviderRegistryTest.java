@@ -20,7 +20,7 @@ class ProviderRegistryTest {
       }
 
       @Override
-      public ProviderResponse complete(PromptRequest request) {
+      public ProviderResponse stream(PromptRequest request, java.util.function.Consumer<String> t) {
         return ProviderResultMapper.success(id, "ok", 1L);
       }
     };

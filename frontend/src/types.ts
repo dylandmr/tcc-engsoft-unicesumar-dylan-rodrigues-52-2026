@@ -13,6 +13,12 @@ export interface ProviderResult {
   responseTimeMs: number | null
 }
 
+/** Payload of an SSE `chunk` event — an incremental text delta for one provider. */
+export interface ChunkEvent {
+  provider: ProviderId
+  delta: string
+}
+
 /** Payload of the SSE `done` event. */
 export interface DoneEvent {
   comparisonId: string

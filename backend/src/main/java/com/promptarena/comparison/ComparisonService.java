@@ -16,6 +16,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -52,11 +53,16 @@ public class ComparisonService {
    * COMPLETE}. Returns the number of providers reported.
    */
   @Transactional
-  public int execute(String comparisonId, Consumer<ResultEvent> onResult) {
+  public int execute(
+      String comparisonId, BiConsumer<Provider, String> onToken, Consumer<ResultEvent> onResult) {
     Comparison comparison = load(comparisonId);
     PromptRequest request = new PromptRequest(comparison.getPrompt());
     List<ProviderResponse> responses =
-        fanOut(comparison.getProviders(), request, response -> onResult.accept(toEvent(response)));
+        fanOut(
+            comparison.getProviders(),
+            request,
+            onToken,
+            response -> onResult.accept(toEvent(response)));
     for (ProviderResponse response : responses) {
       comparison.addResult(
           new ProviderResult(
@@ -96,16 +102,24 @@ public class ComparisonService {
    * per provider as it completes; the returned list is the aggregated set once all have reported.
    */
   List<ProviderResponse> fanOut(
-      List<Provider> providers, PromptRequest request, Consumer<ProviderResponse> onResult) {
+      List<Provider> providers,
+      PromptRequest request,
+      BiConsumer<Provider, String> onToken,
+      Consumer<ProviderResponse> onResult) {
     List<CompletableFuture<ProviderResponse>> futures =
-        providers.stream().map(provider -> dispatch(provider, request, onResult)).toList();
+        providers.stream().map(provider -> dispatch(provider, request, onToken, onResult)).toList();
     return futures.stream().map(CompletableFuture::join).toList();
   }
 
   private CompletableFuture<ProviderResponse> dispatch(
-      Provider provider, PromptRequest request, Consumer<ProviderResponse> onResult) {
+      Provider provider,
+      PromptRequest request,
+      BiConsumer<Provider, String> onToken,
+      Consumer<ProviderResponse> onResult) {
     LlmProvider adapter = registry.get(provider);
-    return CompletableFuture.supplyAsync(() -> adapter.complete(request), providerExecutor)
+    return CompletableFuture.supplyAsync(
+            () -> adapter.stream(request, token -> onToken.accept(provider, token)),
+            providerExecutor)
         .orTimeout(timeoutMs, TimeUnit.MILLISECONDS)
         .exceptionally(ex -> classifyFailure(provider, ex))
         .whenComplete((response, ignored) -> onResult.accept(response));

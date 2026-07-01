@@ -49,7 +49,7 @@ class PersistenceTest {
       }
 
       @Override
-      public ProviderResponse complete(PromptRequest request) {
+      public ProviderResponse stream(PromptRequest request, java.util.function.Consumer<String> t) {
         return behavior.apply(id);
       }
     };
@@ -74,7 +74,7 @@ class PersistenceTest {
                   throw new IllegalStateException("rate_limited");
                 }));
 
-    int reported = comparisonService.execute(pending.getId(), event -> {});
+    int reported = comparisonService.execute(pending.getId(), (p, t) -> {}, event -> {});
 
     assertThat(reported).isEqualTo(2);
 

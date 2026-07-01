@@ -3,6 +3,7 @@ package com.promptarena.provider;
 import com.promptarena.dto.PromptRequest;
 import com.promptarena.dto.ProviderResponse;
 import com.promptarena.model.Provider;
+import java.util.function.Consumer;
 
 /**
  * Stand-in for a provider that has no adapter registered. Its call always yields an {@code ERROR}
@@ -22,7 +23,7 @@ public final class UnavailableProvider implements LlmProvider {
   }
 
   @Override
-  public ProviderResponse complete(PromptRequest request) {
+  public ProviderResponse stream(PromptRequest request, Consumer<String> onToken) {
     return ProviderResultMapper.error(id, "provider_not_configured", null);
   }
 }

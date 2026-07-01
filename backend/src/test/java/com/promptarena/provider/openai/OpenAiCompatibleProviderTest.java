@@ -11,6 +11,8 @@ import com.promptarena.dto.PromptRequest;
 import com.promptarena.dto.ProviderResponse;
 import com.promptarena.model.Outcome;
 import com.promptarena.model.Provider;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,27 +39,38 @@ class OpenAiCompatibleProviderTest {
     return new OpenAiCompatibleProvider(Provider.CHATGPT, apiKey, "gpt-test", baseUrl);
   }
 
-  private void stubChat(int status, String content) {
-    String body =
-        content == null
-            ? "{\"error\":{\"message\":\"boom\"}}"
-            : "{\"id\":\"chatcmpl-1\",\"object\":\"chat.completion\",\"created\":1,"
-                + "\"model\":\"gpt-test\",\"choices\":[{\"index\":0,\"message\":{\"role\":"
-                + "\"assistant\",\"content\":\""
-                + content
-                + "\"},\"finish_reason\":\"stop\"}]}";
+  /** A JSON error response (non-streaming) — the SDK raises, mapping to ERROR. */
+  private void stubError(int status) {
     server.stubFor(
         post(anyUrl())
             .willReturn(
                 aResponse()
                     .withStatus(status)
                     .withHeader("Content-Type", "application/json")
-                    .withBody(body)));
+                    .withBody("{\"error\":{\"message\":\"boom\"}}")));
+  }
+
+  /** A streaming (SSE) chat-completion response delivering the given content deltas in order. */
+  private void stubChatStream(String... deltas) {
+    StringBuilder body = new StringBuilder();
+    for (String delta : deltas) {
+      body.append("data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"")
+          .append(delta)
+          .append("\"}}]}\n\n");
+    }
+    body.append("data: [DONE]\n\n");
+    server.stubFor(
+        post(anyUrl())
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withHeader("Content-Type", "text/event-stream")
+                    .withBody(body.toString())));
   }
 
   @Test
   void successfulResponseIsMappedToSuccess() {
-    stubChat(200, "Hello there");
+    stubChatStream("Hello there");
 
     ProviderResponse response = provider("test-key").complete(new PromptRequest("hi"));
 
@@ -69,8 +82,20 @@ class OpenAiCompatibleProviderTest {
   }
 
   @Test
+  void streamsEachDeltaThenAggregatesTheFullText() {
+    stubChatStream("Hello", " there", "!");
+
+    List<String> tokens = new ArrayList<>();
+    ProviderResponse response = provider("test-key").stream(new PromptRequest("hi"), tokens::add);
+
+    assertThat(tokens).containsExactly("Hello", " there", "!");
+    assertThat(response.text()).isEqualTo("Hello there!");
+    assertThat(response.outcome()).isEqualTo(Outcome.SUCCESS);
+  }
+
+  @Test
   void blankContentIsMappedToEmpty() {
-    stubChat(200, "");
+    stubChatStream("");
 
     ProviderResponse response = provider("test-key").complete(new PromptRequest("hi"));
 
@@ -80,7 +105,7 @@ class OpenAiCompatibleProviderTest {
 
   @Test
   void serverErrorIsMappedToError() {
-    stubChat(500, null);
+    stubError(500);
 
     ProviderResponse response = provider("test-key").complete(new PromptRequest("hi"));
 

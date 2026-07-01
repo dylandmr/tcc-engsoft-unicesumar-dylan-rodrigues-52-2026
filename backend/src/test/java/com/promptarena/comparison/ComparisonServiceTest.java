@@ -56,7 +56,7 @@ class ComparisonServiceTest {
     return new ComparisonService(registry, executor, comparisons, timeoutMs);
   }
 
-  /** An adapter whose {@link #complete} behavior is supplied per provider. */
+  /** An adapter whose behavior is supplied per provider; it streams its text as one token. */
   private static LlmProvider adapter(Provider id, Function<Provider, ProviderResponse> behavior) {
     return new LlmProvider() {
       @Override
@@ -65,8 +65,12 @@ class ComparisonServiceTest {
       }
 
       @Override
-      public ProviderResponse complete(PromptRequest request) {
-        return behavior.apply(id);
+      public ProviderResponse stream(PromptRequest request, java.util.function.Consumer<String> t) {
+        ProviderResponse response = behavior.apply(id);
+        if (response.text() != null) {
+          t.accept(response.text());
+        }
+        return response;
       }
     };
   }
@@ -90,10 +94,26 @@ class ComparisonServiceTest {
     List<ProviderResponse> emitted = new ArrayList<>();
 
     List<ProviderResponse> responses =
-        service(45_000).fanOut(providers, new PromptRequest("hi"), emitted::add);
+        service(45_000).fanOut(providers, new PromptRequest("hi"), (p, t) -> {}, emitted::add);
 
     assertThat(responses).extracting(ProviderResponse::outcome).containsOnly(Outcome.SUCCESS);
     assertThat(emitted).hasSize(3);
+  }
+
+  @Test
+  void fanOutForwardsStreamedTokensPerProvider() {
+    List<Provider> providers = List.of(Provider.CLAUDE);
+    register(Map.of(Provider.CLAUDE, adapter(Provider.CLAUDE, ComparisonServiceTest::ok)));
+    Map<Provider, String> tokens = new ConcurrentHashMap<>();
+
+    service(45_000)
+        .fanOut(
+            providers,
+            new PromptRequest("hi"),
+            (provider, token) -> tokens.merge(provider, token, String::concat),
+            r -> {});
+
+    assertThat(tokens.get(Provider.CLAUDE)).isEqualTo("answer-" + Provider.CLAUDE);
   }
 
   @Test
@@ -154,7 +174,7 @@ class ComparisonServiceTest {
                     })));
 
     List<ProviderResponse> responses =
-        service(45_000).fanOut(providers, new PromptRequest("hi"), r -> {});
+        service(45_000).fanOut(providers, new PromptRequest("hi"), (p, t) -> {}, r -> {});
 
     assertThat(responses).extracting(ProviderResponse::outcome).containsOnly(Outcome.ERROR);
   }
@@ -167,7 +187,7 @@ class ComparisonServiceTest {
     register(Map.of(Provider.CLAUDE, adapter(Provider.CLAUDE, ComparisonServiceTest::ok)));
     List<ResultEvent> events = new ArrayList<>();
 
-    int completed = service(45_000).execute("c1", events::add);
+    int completed = service(45_000).execute("c1", (p, t) -> {}, events::add);
 
     assertThat(completed).isEqualTo(1);
     assertThat(events).hasSize(1);
@@ -181,7 +201,7 @@ class ComparisonServiceTest {
   void executeThrowsWhenComparisonMissing() {
     when(comparisons.findById("gone")).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> service(45_000).execute("gone", e -> {}))
+    assertThatThrownBy(() -> service(45_000).execute("gone", (p, t) -> {}, e -> {}))
         .isInstanceOf(NoSuchElementException.class);
   }
 
@@ -209,6 +229,7 @@ class ComparisonServiceTest {
     service.fanOut(
         providers,
         new PromptRequest("hi"),
+        (p, t) -> {},
         response -> outcomes.put(response.provider(), response.outcome()));
     return outcomes;
   }

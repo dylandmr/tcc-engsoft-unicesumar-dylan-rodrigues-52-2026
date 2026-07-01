@@ -1,6 +1,7 @@
 package com.promptarena.comparison;
 
 import com.promptarena.auth.CurrentUserService;
+import com.promptarena.dto.ChunkEvent;
 import com.promptarena.dto.ComparisonDetailResponse;
 import com.promptarena.dto.ComparisonListResponse;
 import com.promptarena.dto.ComparisonSummary;
@@ -129,7 +130,10 @@ public class ComparisonController {
     try {
       int completed =
           comparison.getStatus() == Status.PENDING
-              ? comparisonService.execute(comparison.getId(), event -> send(emitter, event))
+              ? comparisonService.execute(
+                  comparison.getId(),
+                  (provider, delta) -> sendChunk(emitter, provider, delta),
+                  event -> send(emitter, event))
               : comparisonService.replay(comparison.getId(), event -> send(emitter, event));
       emitter.send(
           SseEmitter.event().name("done").data(new DoneEvent(comparison.getId(), completed)));
@@ -142,6 +146,15 @@ public class ComparisonController {
   private static void send(SseEmitter emitter, ResultEvent event) {
     try {
       emitter.send(SseEmitter.event().name("result").data(event));
+    } catch (IOException ex) {
+      throw new UncheckedIOException(ex);
+    }
+  }
+
+  /** Emit one provider's incremental text delta as a {@code chunk} SSE event. */
+  private static void sendChunk(SseEmitter emitter, Provider provider, String delta) {
+    try {
+      emitter.send(SseEmitter.event().name("chunk").data(new ChunkEvent(provider, delta)));
     } catch (IOException ex) {
       throw new UncheckedIOException(ex);
     }

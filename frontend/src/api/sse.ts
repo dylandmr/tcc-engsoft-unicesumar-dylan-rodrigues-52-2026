@@ -1,4 +1,4 @@
-import type { DoneEvent, ProviderResult } from '../types'
+import type { ChunkEvent, DoneEvent, ProviderResult } from '../types'
 import { ApiError } from './client'
 
 export interface ParsedEvent {
@@ -23,6 +23,7 @@ export function parseBlock(block: string): ParsedEvent | null {
 }
 
 export interface StreamHandlers {
+  onChunk: (chunk: ChunkEvent) => void
   onResult: (result: ProviderResult) => void
   onDone: (done: DoneEvent) => void
 }
@@ -30,9 +31,10 @@ export interface StreamHandlers {
 function dispatch(block: string, handlers: StreamHandlers): void {
   const evt = parseBlock(block)
   if (!evt) return
-  if (evt.event === 'result') handlers.onResult(evt.data as ProviderResult)
+  if (evt.event === 'chunk') handlers.onChunk(evt.data as ChunkEvent)
+  else if (evt.event === 'result') handlers.onResult(evt.data as ProviderResult)
   else if (evt.event === 'done') handlers.onDone(evt.data as DoneEvent)
-  // Other events (e.g. token chunks) are ignored by this MVP consumer.
+  // Any other event name is ignored (e.g. keep-alive comments carry no data).
 }
 
 /**

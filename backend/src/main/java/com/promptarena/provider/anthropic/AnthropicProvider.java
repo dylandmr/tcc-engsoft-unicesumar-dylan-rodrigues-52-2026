@@ -2,16 +2,19 @@ package com.promptarena.provider.anthropic;
 
 import com.anthropic.client.AnthropicClient;
 import com.anthropic.client.okhttp.AnthropicOkHttpClient;
-import com.anthropic.models.messages.ContentBlock;
-import com.anthropic.models.messages.Message;
+import com.anthropic.core.http.StreamResponse;
 import com.anthropic.models.messages.MessageCreateParams;
+import com.anthropic.models.messages.RawContentBlockDelta;
+import com.anthropic.models.messages.RawContentBlockDeltaEvent;
+import com.anthropic.models.messages.RawMessageStreamEvent;
+import com.anthropic.models.messages.TextDelta;
 import com.promptarena.dto.PromptRequest;
 import com.promptarena.dto.ProviderResponse;
 import com.promptarena.model.Provider;
 import com.promptarena.provider.LlmProvider;
 import com.promptarena.provider.ProviderResultMapper;
 import java.time.Duration;
-import java.util.stream.Collectors;
+import java.util.function.Consumer;
 
 /**
  * Adapter over the official Anthropic Java SDK (Claude). No SDK type leaks past this class
@@ -47,7 +50,7 @@ public final class AnthropicProvider implements LlmProvider {
   }
 
   @Override
-  public ProviderResponse complete(PromptRequest request) {
+  public ProviderResponse stream(PromptRequest request, Consumer<String> onToken) {
     if (client == null) {
       return ProviderResultMapper.error(Provider.CLAUDE, "provider_not_configured", null);
     }
@@ -59,13 +62,23 @@ public final class AnthropicProvider implements LlmProvider {
               .maxTokens(MAX_TOKENS)
               .addUserMessage(request.prompt())
               .build();
-      Message message = client.messages().create(params);
-      String text =
-          message.content().stream()
-              .filter(ContentBlock::isText)
-              .map(block -> block.asText().text())
-              .collect(Collectors.joining());
-      return ProviderResultMapper.success(Provider.CLAUDE, text, elapsedMs(start));
+      StringBuilder full = new StringBuilder();
+      try (StreamResponse<RawMessageStreamEvent> events =
+          client.messages().createStreaming(params)) {
+        events.stream()
+            .map(RawMessageStreamEvent::contentBlockDelta)
+            .flatMap(java.util.Optional::stream)
+            .map(RawContentBlockDeltaEvent::delta)
+            .map(RawContentBlockDelta::text)
+            .flatMap(java.util.Optional::stream)
+            .map(TextDelta::text)
+            .forEach(
+                delta -> {
+                  full.append(delta);
+                  onToken.accept(delta);
+                });
+      }
+      return ProviderResultMapper.success(Provider.CLAUDE, full.toString(), elapsedMs(start));
     } catch (RuntimeException ex) {
       return ProviderResultMapper.error(Provider.CLAUDE, ex.getMessage(), elapsedMs(start));
     }
