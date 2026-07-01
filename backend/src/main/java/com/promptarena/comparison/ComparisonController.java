@@ -24,6 +24,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -95,7 +96,12 @@ public class ComparisonController {
     return new ComparisonListResponse(items);
   }
 
-  /** Full detail of one owned comparison, including each recorded result (FR-014, FR-016). */
+  /**
+   * Full detail of one owned comparison, including each recorded result (FR-014, FR-016).
+   * Transactional so the lazy {@code results} collection loads within the session (open-in-view is
+   * disabled, so view-time lazy access would otherwise fail).
+   */
+  @Transactional(readOnly = true)
   @GetMapping("/{id}")
   public ComparisonDetailResponse detail(@PathVariable String id) {
     Comparison comparison = loadOwned(id);

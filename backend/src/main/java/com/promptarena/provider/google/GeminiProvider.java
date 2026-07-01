@@ -18,7 +18,9 @@ import java.time.Duration;
  */
 public final class GeminiProvider implements LlmProvider {
 
-  public static final String DEFAULT_MODEL = "gemini-2.0-flash";
+  // gemini-2.5-flash is the current default because the free tier for gemini-2.0-flash now grants
+  // zero requests on new keys (429 "limit: 0"); 2.5-flash works on the free tier.
+  public static final String DEFAULT_MODEL = "gemini-2.5-flash";
   public static final String DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com";
 
   private final String model;
