@@ -77,7 +77,9 @@ The "all five" figure is just the **minimum top-ups** below — actual usage dur
 2. Sign in with a Google account → **Create API key** (you can create it in a new or existing
    Google Cloud project).
 3. Copy the key into `GOOGLE_API_KEY`.
-- Default model: `gemini-2.0-flash` (override with `GOOGLE_MODEL`). Base: `generativelanguage.googleapis.com`.
+- Default model: `gemini-2.5-flash` (override with `GOOGLE_MODEL`). Base: `generativelanguage.googleapis.com`.
+- Note: `gemini-2.0-flash` now returns `429 … limit: 0` on new free-tier keys — Google moved the free
+  tier to the 2.5 line, which is why the default is `gemini-2.5-flash`.
 
 ### 2.2 OpenAI ChatGPT — `OPENAI_API_KEY`
 
@@ -261,7 +263,7 @@ unavailable; an unset `*_MODEL` ⇒ the default below.
 | `ANTHROPIC_API_KEY` | — | Claude |
 | `ANTHROPIC_MODEL` | `claude-3-5-sonnet-latest` | |
 | `GOOGLE_API_KEY` | — | Gemini (free tier) |
-| `GOOGLE_MODEL` | `gemini-2.0-flash` | |
+| `GOOGLE_MODEL` | `gemini-2.5-flash` | 2.0-flash free tier is now `limit: 0`; 2.5-flash works free |
 | `XAI_API_KEY` | — | Grok |
 | `XAI_MODEL` | `grok-2-latest` | |
 | `DEEPSEEK_API_KEY` | — | DeepSeek |
