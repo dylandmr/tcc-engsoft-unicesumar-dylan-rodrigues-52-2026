@@ -135,6 +135,40 @@ describe('ProviderLane', () => {
     expect(screen.getByText('No content returned.')).toBeInTheDocument()
   })
 
+  it('renders the response as formatted markdown, not raw text', () => {
+    render(
+      <ProviderLane
+        lane={lane({
+          status: 'done',
+          text: '**bold** then\n\n- item one\n- item two',
+        })}
+      />,
+    )
+    const strong = screen.getByText('bold')
+    expect(strong.tagName).toBe('STRONG')
+    expect(screen.getByText('item one')).toBeInTheDocument()
+  })
+
+  it('renders an unconfigured provider as a dimmed, disabled lane', () => {
+    render(
+      <ProviderLane
+        lane={lane({
+          status: 'disabled',
+          errorMessage: 'provider_not_configured',
+        })}
+      />,
+    )
+    expect(screen.getByText('not configured')).toBeInTheDocument()
+    expect(screen.getByText(/No API key configured/)).toBeInTheDocument()
+    // Not surfaced as an error, and no telemetry/copy footer.
+    expect(
+      screen.queryByText('provider_not_configured'),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'copy' }),
+    ).not.toBeInTheDocument()
+  })
+
   it('renders an error lane', () => {
     render(
       <ProviderLane

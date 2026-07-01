@@ -47,5 +47,8 @@ describe('laneStatusInfo', () => {
     expect(laneStatusInfo(lane({ status: 'timeout' })).toneClass).toBe(
       'text-timeout',
     )
+    expect(laneStatusInfo(lane({ status: 'disabled' })).label).toBe(
+      'not configured',
+    )
   })
 })

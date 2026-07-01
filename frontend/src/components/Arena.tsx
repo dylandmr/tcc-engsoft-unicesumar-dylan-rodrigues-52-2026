@@ -21,7 +21,7 @@ export function Arena({ comparisonId, providers, prompt }: ArenaProps) {
         <Link to="/" aria-label="Home">
           <Logo />
         </Link>
-        <p className="max-w-md truncate font-body text-sm text-mist">
+        <p className="min-w-0 max-w-2xl flex-1 truncate text-center font-body text-lg text-bright md:text-xl">
           “{prompt}”
         </p>
         <span className="flex items-center gap-2 rounded-full border border-line px-3 py-1 font-mono text-xs text-mist">

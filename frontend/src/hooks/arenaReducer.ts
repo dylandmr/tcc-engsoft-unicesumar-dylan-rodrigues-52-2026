@@ -1,6 +1,10 @@
 import type { Outcome, ProviderId, ProviderResult } from '../types'
 
-export type LaneStatus = 'live' | 'done' | 'empty' | 'error' | 'timeout'
+export type LaneStatus =
+  'live' | 'done' | 'empty' | 'error' | 'timeout' | 'disabled'
+
+/** A provider with no API key configured reports this as its error message. */
+export const NOT_CONFIGURED = 'provider_not_configured'
 
 export interface LaneState {
   provider: ProviderId
@@ -85,11 +89,15 @@ export function arenaReducer(
         action.result
       const responded = outcome === 'SUCCESS' || outcome === 'EMPTY'
       const first = responded && !state.firstAssigned
+      // A missing API key is a configuration state, not a failure — surface it
+      // as a dimmed "disabled" lane rather than a red error.
+      const status =
+        errorMessage === NOT_CONFIGURED ? 'disabled' : OUTCOME_STATUS[outcome]
       return patchLane(
         { ...state, firstAssigned: state.firstAssigned || first },
         provider,
         {
-          status: OUTCOME_STATUS[outcome],
+          status,
           text: responseText ?? '',
           errorMessage,
           responseTimeMs,

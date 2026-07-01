@@ -20,5 +20,7 @@ export function laneStatusInfo(lane: LaneState): LaneStatusInfo {
       return { label: 'error', toneClass: 'text-error' }
     case 'timeout':
       return { label: 'timeout', toneClass: 'text-timeout' }
+    case 'disabled':
+      return { label: 'not configured', toneClass: 'text-mist' }
   }
 }

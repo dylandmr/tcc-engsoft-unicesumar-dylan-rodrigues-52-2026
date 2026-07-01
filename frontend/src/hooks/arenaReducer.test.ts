@@ -65,6 +65,20 @@ describe('arenaReducer', () => {
     expect(s.lanes.CLAUDE.elapsedMs).toBe(300)
   })
 
+  it('maps an unconfigured provider to a disabled lane, not an error', () => {
+    const s = arenaReducer(start, {
+      type: 'result',
+      result: result({
+        outcome: 'ERROR',
+        responseText: null,
+        errorMessage: 'provider_not_configured',
+        responseTimeMs: null,
+      }),
+    })
+    expect(s.lanes.CLAUDE.status).toBe('disabled')
+    expect(s.lanes.CLAUDE.first).toBe(false)
+  })
+
   it('streamError fails every still-live lane', () => {
     const partial = arenaReducer(start, { type: 'result', result: result({}) })
     const s = arenaReducer(partial, { type: 'streamError' })
