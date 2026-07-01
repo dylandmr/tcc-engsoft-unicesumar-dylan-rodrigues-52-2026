@@ -16,7 +16,6 @@ import org.springframework.security.web.authentication.www.BasicAuthenticationFi
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-import org.springframework.security.web.csrf.XorCsrfTokenRequestAttributeHandler;
 
 /**
  * Security wiring for US3 — session-cookie authentication with CSRF protection (replacing the
@@ -38,10 +37,9 @@ public class SecurityConfig {
   SecurityFilterChain filterChain(
       HttpSecurity http, SecurityContextRepository securityContextRepository) throws Exception {
     CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
-    XorCsrfTokenRequestAttributeHandler csrfRequestHandler =
-        new XorCsrfTokenRequestAttributeHandler();
-    // Opt out of deferred token loading so CsrfCookieFilter can always render the cookie.
-    csrfRequestHandler.setCsrfRequestAttributeName(null);
+    // SPA cookie pattern: render with XOR/BREACH protection, but resolve the raw token the SPA
+    // echoes back in the X-XSRF-TOKEN header. A pure XOR handler would reject that header.
+    SpaCsrfTokenRequestHandler csrfRequestHandler = new SpaCsrfTokenRequestHandler();
 
     http.authorizeHttpRequests(
             auth ->
