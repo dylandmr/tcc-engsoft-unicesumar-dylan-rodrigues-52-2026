@@ -44,6 +44,33 @@ lives, the environment variable the app reads, and the default model (override w
 > Treat every key like a password. They go only in your local, git-ignored `.env` — never commit
 > them. The app reads them **server-side only**; they are never sent to the browser.
 
+### Cost & rollout strategy (what to spend, and when)
+
+You do **not** have to pay anything to try Prompt Arena. Only **Google Gemini** has a free tier; the
+other four are prepaid (you top up a small balance before the key works). So there are two milestones:
+
+| Milestone | Providers | One-time spend |
+|-----------|-----------|----------------|
+| **Validate locally (now)** | Gemini only (free) — the other four lanes show "unavailable", which also demonstrates the US2 isolation feature | **R$0** |
+| **Full side-by-side demo (final presentation)** | all five with real keys | **≈ US$17 ≈ R$95–110** |
+
+The "all five" figure is just the **minimum top-ups** below — actual usage during a demo is pennies.
+
+| Provider | Min top-up | ~BRL | Where |
+|----------|-----------|------|-------|
+| Gemini | free | R$0 | <https://aistudio.google.com/apikey> |
+| DeepSeek | ~US$2 | ~R$11 | <https://platform.deepseek.com> |
+| OpenAI | ~US$5 | ~R$28 | <https://platform.openai.com> |
+| Anthropic | ~US$5 | ~R$28 | <https://console.anthropic.com> |
+| xAI Grok | ~US$5 | ~R$28 | <https://console.x.ai> |
+| **Total (all 5 live)** | **~US$17** | **≈ R$95–110** | |
+
+> **Recommended path:** start free with **Gemini only** to validate the app end-to-end (§5). Add the
+> other four keys only when preparing the final demo. The BRL total floats with the exchange rate
+> (~R$5.5–6 per US$1 — confirm at top-up time); Anthropic and xAI occasionally grant small signup
+> credits that can shave a bit off. Tip: do the four paid top-ups **a day or two before** the defense
+> — some providers' minimum balances expire, and you avoid leaving credit idle.
+
 ### 2.1 Google Gemini — `GOOGLE_API_KEY` (free tier, easiest)
 
 1. Go to **Google AI Studio**: <https://aistudio.google.com/apikey>
