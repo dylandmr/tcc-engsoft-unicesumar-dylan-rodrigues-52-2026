@@ -14,6 +14,7 @@ import com.promptarena.model.Provider;
 import com.promptarena.provider.LlmProvider;
 import com.promptarena.provider.ProviderResultMapper;
 import java.time.Duration;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 /**
@@ -26,7 +27,10 @@ public final class AnthropicProvider implements LlmProvider {
   public static final String DEFAULT_MODEL = "claude-3-5-sonnet-latest";
   public static final String DEFAULT_BASE_URL = "https://api.anthropic.com";
 
-  private static final long MAX_TOKENS = 1024L;
+  // The Messages API requires an explicit output cap (unlike the other providers, which default to
+  // the model maximum). 4096 comfortably fits the arena's longest answers — the 1024 it replaced
+  // deterministically truncated detailed responses mid-sentence.
+  private static final long MAX_TOKENS = 4096L;
 
   private final String model;
   private final AnthropicClient client;
@@ -63,22 +67,32 @@ public final class AnthropicProvider implements LlmProvider {
               .addUserMessage(request.prompt())
               .build();
       StringBuilder full = new StringBuilder();
+      AtomicBoolean completed = new AtomicBoolean(false);
       try (StreamResponse<RawMessageStreamEvent> events =
           client.messages().createStreaming(params)) {
         events.stream()
-            .map(RawMessageStreamEvent::contentBlockDelta)
-            .flatMap(java.util.Optional::stream)
-            .map(RawContentBlockDeltaEvent::delta)
-            .map(RawContentBlockDelta::text)
-            .flatMap(java.util.Optional::stream)
-            .map(TextDelta::text)
             .forEach(
-                delta -> {
-                  full.append(delta);
-                  onToken.accept(delta);
+                event -> {
+                  // message_stop is the API's terminal event; if the stream ends without it (the
+                  // SDK ends silently — no retry, maxRetries(0)), the text is partial.
+                  if (event.isMessageStop()) {
+                    completed.set(true);
+                  }
+                  event
+                      .contentBlockDelta()
+                      .map(RawContentBlockDeltaEvent::delta)
+                      .flatMap(RawContentBlockDelta::text)
+                      .map(TextDelta::text)
+                      .ifPresent(
+                          delta -> {
+                            full.append(delta);
+                            onToken.accept(delta);
+                          });
                 });
       }
-      return ProviderResultMapper.success(Provider.CLAUDE, full.toString(), elapsedMs(start));
+      return completed.get()
+          ? ProviderResultMapper.success(Provider.CLAUDE, full.toString(), elapsedMs(start))
+          : ProviderResultMapper.truncated(Provider.CLAUDE, elapsedMs(start));
     } catch (RuntimeException ex) {
       return ProviderResultMapper.error(Provider.CLAUDE, ex.getMessage(), elapsedMs(start));
     }

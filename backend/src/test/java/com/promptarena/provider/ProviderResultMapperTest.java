@@ -55,6 +55,17 @@ class ProviderResultMapperTest {
   }
 
   @Test
+  void truncatedStreamIsAnErrorWithTheLocalizedMessage() {
+    ProviderResponse response = ProviderResultMapper.truncated(Provider.CHATGPT, 321L);
+
+    assertThat(response.outcome()).isEqualTo(Outcome.ERROR);
+    assertThat(response.text()).isNull();
+    assertThat(response.errorMessage())
+        .isEqualTo("A resposta foi interrompida antes de ser concluída. Tente novamente.");
+    assertThat(response.responseTimeMs()).isEqualTo(321L);
+  }
+
+  @Test
   void timeoutHasNoLatency() {
     ProviderResponse response = ProviderResultMapper.timeout(Provider.DEEPSEEK);
 

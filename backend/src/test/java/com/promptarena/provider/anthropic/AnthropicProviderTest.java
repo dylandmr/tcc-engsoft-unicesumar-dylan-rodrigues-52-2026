@@ -56,6 +56,27 @@ class AnthropicProviderTest {
    * message_start → content_block_delta* → message_stop event sequence.
    */
   private void stubMessagesStream(String... deltas) {
+    StringBuilder body = openingEvents(deltas);
+    body.append("event: content_block_stop\n")
+        .append("data: {\"type\":\"content_block_stop\",\"index\":0}\n\n")
+        .append("event: message_delta\n")
+        .append(
+            "data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\","
+                + "\"stop_sequence\":null},\"usage\":{\"output_tokens\":1}}\n\n")
+        .append("event: message_stop\n")
+        .append("data: {\"type\":\"message_stop\"}\n\n");
+    stubStream(body);
+  }
+
+  /**
+   * A truncated stream: the deltas arrive but the HTTP stream ends before the terminal {@code
+   * message_stop} event, as happens on a mid-answer network drop.
+   */
+  private void stubIncompleteMessagesStream(String... deltas) {
+    stubStream(openingEvents(deltas));
+  }
+
+  private static StringBuilder openingEvents(String... deltas) {
     StringBuilder body = new StringBuilder();
     body.append("event: message_start\n")
         .append(
@@ -74,14 +95,10 @@ class AnthropicProviderTest {
           .append(delta)
           .append("\"}}\n\n");
     }
-    body.append("event: content_block_stop\n")
-        .append("data: {\"type\":\"content_block_stop\",\"index\":0}\n\n")
-        .append("event: message_delta\n")
-        .append(
-            "data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\","
-                + "\"stop_sequence\":null},\"usage\":{\"output_tokens\":1}}\n\n")
-        .append("event: message_stop\n")
-        .append("data: {\"type\":\"message_stop\"}\n\n");
+    return body;
+  }
+
+  private void stubStream(StringBuilder body) {
     server.stubFor(
         post(anyUrl())
             .willReturn(
@@ -112,6 +129,21 @@ class AnthropicProviderTest {
     assertThat(tokens).containsExactly("Hello", " ", "world");
     assertThat(response.text()).isEqualTo("Hello world");
     assertThat(response.outcome()).isEqualTo(Outcome.SUCCESS);
+  }
+
+  @Test
+  void streamThatEndsWithoutMessageStopIsMappedToError() {
+    // A mid-answer drop: deltas stream in, but the terminal message_stop event never arrives.
+    stubIncompleteMessagesStream("The answer starts", " and is then cut");
+
+    List<String> tokens = new ArrayList<>();
+    ProviderResponse response = provider("test-key").stream(new PromptRequest("hi"), tokens::add);
+
+    // The partial deltas still stream to the caller, but the result is a truncation error — never a
+    // partial answer dressed up as a complete SUCCESS.
+    assertThat(tokens).containsExactly("The answer starts", " and is then cut");
+    assertThat(response.outcome()).isEqualTo(Outcome.ERROR);
+    assertThat(response.errorMessage()).contains("interrompida");
   }
 
   @Test

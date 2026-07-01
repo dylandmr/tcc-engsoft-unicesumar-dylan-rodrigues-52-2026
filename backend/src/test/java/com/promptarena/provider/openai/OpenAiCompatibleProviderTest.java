@@ -50,15 +50,37 @@ class OpenAiCompatibleProviderTest {
                     .withBody("{\"error\":{\"message\":\"boom\"}}")));
   }
 
-  /** A streaming (SSE) chat-completion response delivering the given content deltas in order. */
+  /**
+   * A complete streaming (SSE) chat-completion response: the given content deltas in order, then
+   * the terminal chunk carrying {@code finish_reason: "stop"} and {@code [DONE]} (as the live API
+   * sends).
+   */
   private void stubChatStream(String... deltas) {
+    StringBuilder body = deltaChunks(deltas);
+    body.append("data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n")
+        .append("data: [DONE]\n\n");
+    stubStream(body);
+  }
+
+  /**
+   * A truncated stream: the deltas arrive but the HTTP stream ends without any {@code
+   * finish_reason} chunk, as happens on a mid-answer network drop.
+   */
+  private void stubIncompleteChatStream(String... deltas) {
+    stubStream(deltaChunks(deltas));
+  }
+
+  private static StringBuilder deltaChunks(String... deltas) {
     StringBuilder body = new StringBuilder();
     for (String delta : deltas) {
       body.append("data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"")
           .append(delta)
           .append("\"}}]}\n\n");
     }
-    body.append("data: [DONE]\n\n");
+    return body;
+  }
+
+  private void stubStream(StringBuilder body) {
     server.stubFor(
         post(anyUrl())
             .willReturn(
@@ -91,6 +113,21 @@ class OpenAiCompatibleProviderTest {
     assertThat(tokens).containsExactly("Hello", " there", "!");
     assertThat(response.text()).isEqualTo("Hello there!");
     assertThat(response.outcome()).isEqualTo(Outcome.SUCCESS);
+  }
+
+  @Test
+  void streamThatEndsWithoutAFinishReasonIsMappedToError() {
+    // A mid-answer drop: deltas stream in, but the finish_reason chunk never arrives.
+    stubIncompleteChatStream("The answer starts", " and is then cut");
+
+    List<String> tokens = new ArrayList<>();
+    ProviderResponse response = provider("test-key").stream(new PromptRequest("hi"), tokens::add);
+
+    // The partial deltas still stream to the caller, but the result is a truncation error — never a
+    // partial answer dressed up as a complete SUCCESS.
+    assertThat(tokens).containsExactly("The answer starts", " and is then cut");
+    assertThat(response.outcome()).isEqualTo(Outcome.ERROR);
+    assertThat(response.errorMessage()).contains("interrompida");
   }
 
   @Test

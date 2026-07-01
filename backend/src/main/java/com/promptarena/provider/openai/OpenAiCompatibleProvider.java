@@ -11,7 +11,7 @@ import com.promptarena.model.Provider;
 import com.promptarena.provider.LlmProvider;
 import com.promptarena.provider.ProviderResultMapper;
 import java.time.Duration;
-import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 /**
@@ -69,19 +69,31 @@ public final class OpenAiCompatibleProvider implements LlmProvider {
               .addUserMessage(request.prompt())
               .build();
       StringBuilder full = new StringBuilder();
+      AtomicBoolean completed = new AtomicBoolean(false);
       try (StreamResponse<ChatCompletionChunk> chunks =
           client.chat().completions().createStreaming(params)) {
         chunks.stream()
             .flatMap(chunk -> chunk.choices().stream())
-            .map(choice -> choice.delta().content())
-            .flatMap(Optional::stream)
             .forEach(
-                delta -> {
-                  full.append(delta);
-                  onToken.accept(delta);
+                choice -> {
+                  choice
+                      .delta()
+                      .content()
+                      .ifPresent(
+                          delta -> {
+                            full.append(delta);
+                            onToken.accept(delta);
+                          });
+                  // The API stamps finish_reason on its terminal chunk; if the stream ends without
+                  // one (the SDK ends silently — no retry, maxRetries(0)), the text is partial.
+                  if (choice.finishReason().isPresent()) {
+                    completed.set(true);
+                  }
                 });
       }
-      return ProviderResultMapper.success(id, full.toString(), elapsedMs(start));
+      return completed.get()
+          ? ProviderResultMapper.success(id, full.toString(), elapsedMs(start))
+          : ProviderResultMapper.truncated(id, elapsedMs(start));
     } catch (RuntimeException ex) {
       return ProviderResultMapper.error(id, ex.getMessage(), elapsedMs(start));
     }

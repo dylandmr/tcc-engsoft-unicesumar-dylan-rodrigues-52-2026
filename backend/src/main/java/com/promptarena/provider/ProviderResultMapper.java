@@ -42,4 +42,19 @@ public final class ProviderResultMapper {
     return new ProviderResponse(
         provider, Outcome.TIMEOUT, null, "Sem resposta dentro do tempo limite.", null);
   }
+
+  /**
+   * A token stream that ended without the provider's terminal completion signal (Gemini's {@code
+   * finishReason}, OpenAI's {@code finish_reason}, Anthropic's {@code message_stop}) — i.e. the
+   * stream dropped mid-answer. Classified as an error so partial text never masquerades as a
+   * complete answer.
+   */
+  public static ProviderResponse truncated(Provider provider, Long responseTimeMs) {
+    return new ProviderResponse(
+        provider,
+        Outcome.ERROR,
+        null,
+        "A resposta foi interrompida antes de ser concluída. Tente novamente.",
+        responseTimeMs);
+  }
 }

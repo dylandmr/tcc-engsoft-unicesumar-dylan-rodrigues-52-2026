@@ -30,12 +30,6 @@ public final class GeminiProvider implements LlmProvider {
   public static final String DEFAULT_MODEL = "gemini-2.5-flash";
   public static final String DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com";
 
-  // Shown when the token stream ends without the model ever reporting a finish reason — i.e. the
-  // HTTP stream dropped mid-answer. Surfacing this (rather than the partial text) prevents a
-  // truncated reply from masquerading as a complete one.
-  private static final String STREAM_TRUNCATED_MESSAGE =
-      "A resposta foi interrompida antes de ser concluída. Tente novamente.";
-
   // Gemini 2.5 models "think" (reason silently) before emitting output, which on longer prompts
   // delays the first streamed token by many seconds — the response then appears in a late burst
   // rather than progressively. Disabling thinking (budget 0) makes tokens stream immediately,
@@ -96,7 +90,7 @@ public final class GeminiProvider implements LlmProvider {
       }
       return completed
           ? ProviderResultMapper.success(Provider.GEMINI, full.toString(), elapsedMs(start))
-          : ProviderResultMapper.error(Provider.GEMINI, STREAM_TRUNCATED_MESSAGE, elapsedMs(start));
+          : ProviderResultMapper.truncated(Provider.GEMINI, elapsedMs(start));
     } catch (RuntimeException ex) {
       return ProviderResultMapper.error(Provider.GEMINI, ex.getMessage(), elapsedMs(start));
     }
