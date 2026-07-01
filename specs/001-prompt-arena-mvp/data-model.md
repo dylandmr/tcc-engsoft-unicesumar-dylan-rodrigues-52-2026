@@ -75,6 +75,10 @@ One provider's outcome for a comparison (FR-011, FR-013, FR-014).
 | response_text    | text                | Nullable (null/empty for non-SUCCESS or EMPTY)         |
 | error_message    | string              | Nullable; populated for ERROR/TIMEOUT outcomes         |
 | response_time_ms | integer             | Nullable; latency recorded per provider (TCC doc)      |
+| first_token_ms   | integer             | Nullable; ms until first streamed token, same clock as response_time_ms (FR-019) |
+| input_tokens     | integer             | Nullable; provider-reported prompt token count (FR-019)|
+| output_tokens    | integer             | Nullable; provider-reported completion token count (FR-019) |
+| model            | string              | Nullable; exact model id the provider reports answered (FR-019) |
 
 **Rules**:
 - `(comparison_id, provider)` MUST be unique — a provider appears at most once per comparison
@@ -85,6 +89,11 @@ One provider's outcome for a comparison (FR-011, FR-013, FR-014).
   still success-class; for `ERROR`/`TIMEOUT`, `error_message` explains the failure (FR-011).
 - `response_time_ms` records the wall-clock latency of that provider's call when measurable
   (constitution: backend records each provider's response time).
+- `first_token_ms`, `input_tokens`, `output_tokens` and `model` record per-result telemetry when the
+  provider reports it (FR-019): time-to-first-token (measured inside the adapter on the same clock
+  epoch as `response_time_ms`, so derived rates like tokens/s are consistent), the provider's own
+  token usage, and the exact model identifier. All four are null when unavailable — e.g. `TIMEOUT`
+  results (the adapter never returned) and `ERROR` results carry no telemetry.
 
 ## Enumerations
 
@@ -131,3 +140,4 @@ COMPLETE  — fan-out finished and ProviderResults persisted
 | TIMEOUT recorded after per-provider limit          | FR-012      |
 | History scoped to owning user                     | FR-015, FR-016 |
 | Per-provider response time captured               | Constitution / TCC |
+| Per-provider telemetry (TTFT, token usage, model) captured when reported | FR-019 |

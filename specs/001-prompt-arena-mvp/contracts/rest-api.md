@@ -115,15 +115,29 @@ Events (each `data:` payload is JSON; events are tagged with `event:` name):
     "outcome": "SUCCESS",
     "responseText": "...",
     "errorMessage": null,
-    "responseTimeMs": 1840
+    "responseTimeMs": 1840,
+    "firstTokenMs": 320,
+    "inputTokens": 12,
+    "outputTokens": 256,
+    "model": "claude-3-5-sonnet-20241022"
   }
   ```
   `outcome` ∈ {`SUCCESS`,`EMPTY`,`ERROR`,`TIMEOUT`} (FR-011, FR-012, FR-013). For `ERROR`/`TIMEOUT`,
   `errorMessage` is set and `responseText` is null.
-- *(optional, if token streaming is implemented)* `event: token` — incremental chunk:
+
+  Telemetry fields (FR-019, all nullable — recorded only when the provider reports them):
+  - `firstTokenMs` — milliseconds from dispatching that provider's call to its first streamed text
+    delta (time-to-first-token), measured on the same clock as `responseTimeMs`. Null when no token
+    ever streamed (errors, timeouts, unconfigured providers).
+  - `inputTokens` / `outputTokens` — the provider's own reported prompt/completion token usage.
+  - `model` — the exact model identifier the provider reports as having answered (which may be more
+    specific than the configured alias, e.g. a dated snapshot).
+- `event: chunk` — one provider's incremental text delta, emitted live while that provider streams
+  (each precedes that provider's `result`):
   ```json
-  { "provider": "CLAUDE", "chunk": "..." }
+  { "provider": "CLAUDE", "delta": "..." }
   ```
+  Replaying a `COMPLETE` comparison emits no `chunk` events — only the persisted `result`s.
 - `event: done` — all providers have reported; the stream then closes:
   ```json
   { "comparisonId": "c_01H...", "completed": 3 }
@@ -173,12 +187,14 @@ Full detail of one past comparison the caller owns, including each provider's re
     "prompt": "Explain quantum entanglement simply.",
     "createdAt": "2026-06-29T18:20:00Z",
     "results": [
-      { "provider": "CLAUDE",  "outcome": "SUCCESS", "responseText": "...", "errorMessage": null, "responseTimeMs": 1840 },
-      { "provider": "CHATGPT", "outcome": "SUCCESS", "responseText": "...", "errorMessage": null, "responseTimeMs": 2110 },
-      { "provider": "GEMINI",  "outcome": "ERROR",   "responseText": null,  "errorMessage": "rate_limited", "responseTimeMs": null }
+      { "provider": "CLAUDE",  "outcome": "SUCCESS", "responseText": "...", "errorMessage": null, "responseTimeMs": 1840, "firstTokenMs": 320,  "inputTokens": 12,   "outputTokens": 256, "model": "claude-3-5-sonnet-20241022" },
+      { "provider": "CHATGPT", "outcome": "SUCCESS", "responseText": "...", "errorMessage": null, "responseTimeMs": 2110, "firstTokenMs": 450,  "inputTokens": 12,   "outputTokens": 301, "model": "gpt-4o-mini-2024-07-18" },
+      { "provider": "GEMINI",  "outcome": "ERROR",   "responseText": null,  "errorMessage": "rate_limited", "responseTimeMs": null, "firstTokenMs": null, "inputTokens": null, "outputTokens": null, "model": null }
     ]
   }
   ```
+  Each result row carries the same nullable telemetry fields as the SSE `result` event
+  (`firstTokenMs`, `inputTokens`, `outputTokens`, `model` — FR-019).
 - **401 Unauthorized**
 - **404 Not Found** — unknown or not owned by caller.
 
@@ -192,7 +208,7 @@ Full detail of one past comparison the caller owns, including each provider's re
 | POST /api/auth/logout | FR-002 |
 | GET /api/auth/me | FR-001 |
 | POST /api/comparisons | FR-004, FR-005, FR-006, FR-007 |
-| GET /api/comparisons/{id}/stream | FR-008, FR-009, FR-010, FR-011, FR-012, FR-013 |
+| GET /api/comparisons/{id}/stream | FR-008, FR-009, FR-010, FR-011, FR-012, FR-013, FR-019 |
 | GET /api/comparisons | FR-015, FR-016, FR-017 |
-| GET /api/comparisons/{id} | FR-014, FR-015, FR-016 |
+| GET /api/comparisons/{id} | FR-014, FR-015, FR-016, FR-019 |
 | (all protected) | FR-001, FR-016; secrets server-side FR-018 |

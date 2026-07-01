@@ -176,6 +176,12 @@ never appear.
 - **FR-017**: System MUST show a clear empty state in history when the user has no past comparisons.
 - **FR-018**: System MUST keep provider credentials server-side only and MUST NOT expose them to the
   user-facing client.
+- **FR-019**: System MUST record, per provider result, the telemetry needed for the thesis's
+  comparative analysis: the total response time, the time until the first streamed token
+  (time-to-first-token, measured on the same clock as the response time), the provider-reported
+  input and output token counts, and the exact model identifier the provider reports as having
+  answered. Each telemetry value is captured when the provider makes it available and recorded as
+  absent (null) otherwise — e.g. a timed-out provider has no telemetry.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -188,8 +194,9 @@ never appear.
   the prompt text, the submitting user, the selected providers, and a timestamp. Has one Provider
   Result per selected provider.
 - **Provider Result**: One provider's outcome for a comparison. Key attributes: which provider, the
-  response content (if any), and the outcome state (success, empty, error, or timeout). Belongs to a
-  Comparison.
+  response content (if any), the outcome state (success, empty, error, or timeout), and the recorded
+  telemetry (response time, time-to-first-token, input/output token counts, exact model identifier —
+  each when reported, FR-019). Belongs to a Comparison.
 
 ## Success Criteria *(mandatory)*
 
