@@ -5,7 +5,7 @@ import { Logo } from './Logo'
 /** Top navigation bar with the wordmark and right-aligned nav slot. */
 export function TopBar({ children }: { children?: ReactNode }) {
   return (
-    <header className="flex items-center justify-between px-8 py-6">
+    <header className="flex items-center justify-between px-6 py-6">
       <Link to="/" aria-label="Início">
         <Logo />
       </Link>

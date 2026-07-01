@@ -26,13 +26,20 @@ export function ProviderChip({
       disabled={disabled}
       onClick={onToggle}
       className={cn(
-        'inline-flex items-center gap-2 rounded-full border px-4 py-2 font-body text-sm transition',
-        selected ? cn(style.border, 'text-bright') : 'border-line text-mist',
+        'inline-flex items-center gap-2 rounded-full border px-4 py-2 font-body text-sm transition duration-150 active:scale-95',
+        selected
+          ? cn(style.border, style.chipBg, 'text-bright')
+          : 'border-line text-mist hover:border-mist/70 hover:text-bright',
         disabled && 'cursor-not-allowed opacity-40',
       )}
     >
       <span
-        className={cn('size-2 rounded-full', selected ? style.dot : 'bg-mist')}
+        className={cn(
+          'size-2 rounded-full transition',
+          style.dot,
+          // Unselected keeps the provider hue, just dimmed — never dead gray.
+          !selected && 'opacity-40',
+        )}
       />
       {meta.label}
     </button>

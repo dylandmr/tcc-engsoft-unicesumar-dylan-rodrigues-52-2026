@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { MotionConfig } from 'framer-motion'
 import { SessionProvider } from './auth/SessionContext'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import { LoginPage } from './pages/LoginPage'
@@ -43,9 +44,12 @@ export function AppRoutes() {
 export default function App() {
   return (
     <SessionProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
+      {/* Respect the OS-level reduced-motion preference for all framer-motion work. */}
+      <MotionConfig reducedMotion="user">
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </MotionConfig>
     </SessionProvider>
   )
 }

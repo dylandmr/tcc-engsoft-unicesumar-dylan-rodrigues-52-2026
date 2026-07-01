@@ -8,7 +8,7 @@ import remarkGfm from 'remark-gfm'
  */
 export function Markdown({ children }: { children: string }) {
   return (
-    <div className="prose prose-sm prose-invert max-w-none break-words prose-headings:font-display prose-headings:text-bright prose-strong:text-bright prose-a:text-ignition prose-code:text-ignition prose-pre:bg-black/40 prose-pre:text-bright">
+    <div className="prose prose-sm prose-invert max-w-none break-words prose-headings:font-display prose-headings:tracking-tight prose-headings:text-bright prose-p:text-bright/85 prose-a:text-ignition prose-blockquote:border-l-line prose-strong:text-bright prose-code:text-ignition prose-code:before:content-none prose-code:after:content-none prose-pre:rounded-lg prose-pre:border prose-pre:border-line prose-pre:bg-black/40 prose-pre:text-bright prose-li:text-bright/85 prose-li:marker:text-mist prose-td:text-bright/85 prose-hr:border-line">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{children}</ReactMarkdown>
     </div>
   )

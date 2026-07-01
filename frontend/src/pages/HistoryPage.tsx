@@ -18,7 +18,7 @@ function HistoryRow({ item }: { item: ComparisonSummary }) {
     <li>
       <button
         onClick={open}
-        className="flex w-full items-center justify-between gap-4 rounded-[var(--radius-panel)] border border-line bg-deck px-5 py-4 text-left hover:border-mist"
+        className="flex w-full items-center justify-between gap-4 rounded-[var(--radius-panel)] border border-line bg-deck px-5 py-4 text-left shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04),0_8px_24px_-12px_rgba(0,0,0,0.8)] transition duration-150 hover:-translate-y-0.5 hover:border-mist active:translate-y-0"
       >
         <span className="min-w-0">
           <span className="block truncate font-body text-bright">
@@ -63,8 +63,8 @@ export function HistoryPage() {
         </button>
       </TopBar>
 
-      <main className="mx-auto max-w-4xl px-6">
-        <p className="font-mono text-xs tracking-wider text-ignition">
+      <main className="page-in mx-auto max-w-4xl px-6 pt-16">
+        <p className="font-mono text-xs tracking-[0.18em] text-ignition">
           HISTÓRICO
         </p>
         <h1 className="mt-2 mb-8 font-display text-4xl font-medium text-bright">

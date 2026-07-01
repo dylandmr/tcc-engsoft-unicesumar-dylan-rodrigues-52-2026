@@ -30,8 +30,8 @@ export function ComposerPage() {
         </button>
       </TopBar>
 
-      <main className="mx-auto max-w-3xl px-6 pt-16">
-        <p className="font-mono text-xs tracking-wider text-ignition">
+      <main className="page-in mx-auto max-w-3xl px-6 pt-16">
+        <p className="font-mono text-xs tracking-[0.18em] text-ignition">
           NOVA COMPARAÇÃO
         </p>
         <h1 className="mt-3 font-display text-4xl font-medium text-bright">
@@ -42,7 +42,7 @@ export function ComposerPage() {
           <PromptInput value={c.prompt} onChange={c.setPrompt} />
 
           <div>
-            <p className="font-mono text-xs tracking-wider text-mist">
+            <p className="font-mono text-xs tracking-[0.18em] text-mist">
               SELECIONE ATÉ 4 MODELOS · {c.selected.length} ESCOLHIDO(S)
             </p>
             <div className="mt-3 flex flex-wrap gap-3">

@@ -8,7 +8,7 @@ import { Logo } from '../components/ui/Logo'
 export function LoginPage() {
   const f = useLogin()
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center px-6">
+    <main className="page-in flex min-h-screen flex-col items-center justify-center px-6">
       <Backdrop />
       <div className="mb-8 flex flex-col items-center gap-2 text-center">
         <Logo />
@@ -18,7 +18,7 @@ export function LoginPage() {
       </div>
 
       <Panel className="w-full max-w-md p-6">
-        <p className="mb-4 font-mono text-xs tracking-wider text-ignition">
+        <p className="mb-4 font-mono text-xs tracking-[0.18em] text-ignition">
           ENTRAR
         </p>
         <form onSubmit={f.submit} className="flex flex-col gap-3">
@@ -27,7 +27,7 @@ export function LoginPage() {
             placeholder="usuário"
             value={f.username}
             onChange={(e) => f.setUsername(e.target.value)}
-            className="rounded-lg border border-line bg-void px-4 py-3 font-body text-bright placeholder:text-mist focus:border-ignition focus:outline-none"
+            className="rounded-lg border border-line bg-void px-4 py-3 font-body text-bright transition-colors placeholder:text-mist focus:outline-none focus-visible:border-ignition focus-visible:ring-2 focus-visible:ring-ignition/25"
           />
           <input
             aria-label="Senha"
@@ -35,7 +35,7 @@ export function LoginPage() {
             placeholder="senha"
             value={f.password}
             onChange={(e) => f.setPassword(e.target.value)}
-            className="rounded-lg border border-line bg-void px-4 py-3 font-body text-bright placeholder:text-mist focus:border-ignition focus:outline-none"
+            className="rounded-lg border border-line bg-void px-4 py-3 font-body text-bright transition-colors placeholder:text-mist focus:outline-none focus-visible:border-ignition focus-visible:ring-2 focus-visible:ring-ignition/25"
           />
           {f.error && (
             <p role="alert" className="font-body text-sm text-error">

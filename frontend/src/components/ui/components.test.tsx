@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Button } from './Button'
 import { Panel } from './Panel'
@@ -190,5 +190,62 @@ describe('ProviderLane', () => {
     )
     expect(screen.getByText(/time limit/)).toBeInTheDocument()
     expect(screen.getByText('tempo esgotado')).toBeInTheDocument()
+  })
+})
+
+describe('ProviderLane auto-follow scroll', () => {
+  const scrollBody = (container: HTMLElement) => {
+    const body = container.querySelector('.overflow-y-auto') as HTMLDivElement
+    Object.defineProperty(body, 'scrollHeight', {
+      configurable: true,
+      value: 480,
+    })
+    return body
+  }
+
+  it('pins a live lane to the newest streamed tokens', () => {
+    const { container, rerender } = render(
+      <ProviderLane lane={lane({ status: 'live', text: 'linha um' })} />,
+    )
+    const body = scrollBody(container)
+    rerender(
+      <ProviderLane lane={lane({ status: 'live', text: 'linha um e dois' })} />,
+    )
+    expect(body.scrollTop).toBe(480)
+  })
+
+  it('leaves scroll control to the reader once the lane is done', () => {
+    const { container, rerender } = render(
+      <ProviderLane lane={lane({ status: 'done', text: 'linha um' })} />,
+    )
+    const body = scrollBody(container)
+    rerender(
+      <ProviderLane lane={lane({ status: 'done', text: 'linha um e dois' })} />,
+    )
+    expect(body.scrollTop).toBe(0)
+  })
+})
+
+describe('ProviderLane copy feedback', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('confirms with a transient "copiado ✓" then reverts', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const writeText = vi.fn()
+    Object.assign(navigator, { clipboard: { writeText } })
+    render(<ProviderLane lane={lane({ status: 'done', text: 'abc' })} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'copiar' }))
+    expect(writeText).toHaveBeenCalledWith('abc')
+    expect(
+      screen.getByRole('button', { name: /copiado ✓/ }),
+    ).toBeInTheDocument()
+
+    act(() => {
+      vi.advanceTimersByTime(1500)
+    })
+    expect(screen.getByRole('button', { name: 'copiar' })).toBeInTheDocument()
   })
 })

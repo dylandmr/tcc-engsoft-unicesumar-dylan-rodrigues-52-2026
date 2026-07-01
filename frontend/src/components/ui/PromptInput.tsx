@@ -9,7 +9,7 @@ interface PromptInputProps {
 /** The prompt textarea with a bottom telemetry footer (char count). */
 export function PromptInput({ value, onChange }: PromptInputProps) {
   return (
-    <Panel className="flex flex-col gap-4 p-5">
+    <Panel className="flex flex-col gap-4 p-5 transition-colors focus-within:border-ignition/60">
       <textarea
         aria-label="Prompt"
         placeholder="Explique o emaranhamento quântico de forma simples, para uma criança curiosa de 12 anos."
