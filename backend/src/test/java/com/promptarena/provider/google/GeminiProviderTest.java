@@ -51,13 +51,32 @@ class GeminiProviderTest {
                         "{\"error\":{\"code\":500,\"message\":\"boom\",\"status\":\"INTERNAL\"}}")));
   }
 
-  /** A streaming (SSE) generateContent response delivering the given text deltas in order. */
+  /**
+   * A complete streaming (SSE) generateContent response: the given text deltas in order, with the
+   * model's terminal {@code finishReason: STOP} stamped on the last chunk (as the live API does).
+   */
   private void stubGenerateStream(String... deltas) {
+    stubStream(true, deltas);
+  }
+
+  /**
+   * A truncated stream: the given deltas arrive but the HTTP stream ends without any {@code
+   * finishReason}, as happens on a mid-answer network drop.
+   */
+  private void stubIncompleteStream(String... deltas) {
+    stubStream(false, deltas);
+  }
+
+  private void stubStream(boolean complete, String... deltas) {
     StringBuilder body = new StringBuilder();
-    for (String delta : deltas) {
+    for (int i = 0; i < deltas.length; i++) {
       body.append("data: {\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"")
-          .append(delta)
-          .append("\"}]}}]}\n\n");
+          .append(deltas[i])
+          .append("\"}]}");
+      if (complete && i == deltas.length - 1) {
+        body.append(",\"finishReason\":\"STOP\"");
+      }
+      body.append("}]}\n\n");
     }
     server.stubFor(
         post(anyUrl())
@@ -89,6 +108,21 @@ class GeminiProviderTest {
     assertThat(tokens).containsExactly("Hello", " from", " Gemini");
     assertThat(response.text()).isEqualTo("Hello from Gemini");
     assertThat(response.outcome()).isEqualTo(Outcome.SUCCESS);
+  }
+
+  @Test
+  void streamThatEndsWithoutAFinishReasonIsMappedToError() {
+    // A mid-answer drop: deltas stream in, but the terminal finishReason chunk never arrives.
+    stubIncompleteStream("A resposta começa", " e então é cortada");
+
+    List<String> tokens = new ArrayList<>();
+    ProviderResponse response = provider("test-key").stream(new PromptRequest("hi"), tokens::add);
+
+    // The partial deltas still stream to the caller, but the result is a truncation error — never a
+    // partial answer dressed up as a complete SUCCESS.
+    assertThat(tokens).containsExactly("A resposta começa", " e então é cortada");
+    assertThat(response.outcome()).isEqualTo(Outcome.ERROR);
+    assertThat(response.errorMessage()).contains("interrompida");
   }
 
   @Test

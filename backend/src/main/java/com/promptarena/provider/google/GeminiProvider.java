@@ -2,6 +2,7 @@ package com.promptarena.provider.google;
 
 import com.google.genai.Client;
 import com.google.genai.ResponseStream;
+import com.google.genai.types.Candidate;
 import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.GenerateContentResponse;
 import com.google.genai.types.HttpOptions;
@@ -13,6 +14,7 @@ import com.promptarena.model.Provider;
 import com.promptarena.provider.LlmProvider;
 import com.promptarena.provider.ProviderResultMapper;
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 
@@ -27,6 +29,12 @@ public final class GeminiProvider implements LlmProvider {
   // zero requests on new keys (429 "limit: 0"); 2.5-flash works on the free tier.
   public static final String DEFAULT_MODEL = "gemini-2.5-flash";
   public static final String DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com";
+
+  // Shown when the token stream ends without the model ever reporting a finish reason — i.e. the
+  // HTTP stream dropped mid-answer. Surfacing this (rather than the partial text) prevents a
+  // truncated reply from masquerading as a complete one.
+  private static final String STREAM_TRUNCATED_MESSAGE =
+      "A resposta foi interrompida antes de ser concluída. Tente novamente.";
 
   // Gemini 2.5 models "think" (reason silently) before emitting output, which on longer prompts
   // delays the first streamed token by many seconds — the response then appears in a late burst
@@ -69,6 +77,7 @@ public final class GeminiProvider implements LlmProvider {
     long start = System.nanoTime();
     try {
       StringBuilder full = new StringBuilder();
+      boolean completed = false;
       try (ResponseStream<GenerateContentResponse> chunks =
           client.models.generateContentStream(model, request.prompt(), STREAM_CONFIG)) {
         for (GenerateContentResponse chunk : chunks) {
@@ -78,12 +87,27 @@ public final class GeminiProvider implements LlmProvider {
                     full.append(delta);
                     onToken.accept(delta);
                   });
+          // The model stamps a finish reason on its terminal chunk; if the loop ends without one,
+          // the stream dropped mid-answer (no SDK retry — attempts(1)) and the text is partial.
+          if (hasFinishReason(chunk)) {
+            completed = true;
+          }
         }
       }
-      return ProviderResultMapper.success(Provider.GEMINI, full.toString(), elapsedMs(start));
+      return completed
+          ? ProviderResultMapper.success(Provider.GEMINI, full.toString(), elapsedMs(start))
+          : ProviderResultMapper.error(Provider.GEMINI, STREAM_TRUNCATED_MESSAGE, elapsedMs(start));
     } catch (RuntimeException ex) {
       return ProviderResultMapper.error(Provider.GEMINI, ex.getMessage(), elapsedMs(start));
     }
+  }
+
+  /** Whether any candidate on this chunk carries a finish reason (a definitive end-of-stream). */
+  private static boolean hasFinishReason(GenerateContentResponse chunk) {
+    return chunk.candidates().stream()
+        .flatMap(List::stream)
+        .map(Candidate::finishReason)
+        .anyMatch(Optional::isPresent);
   }
 
   private static long elapsedMs(long startNanos) {
