@@ -78,7 +78,7 @@ export function ProviderLane({
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
         {isDisabled ? (
           <p className="text-sm text-mist">
-            No API key configured for this provider.
+            Nenhuma chave de API configurada para este provedor.
           </p>
         ) : isFault ? (
           <p
@@ -90,7 +90,7 @@ export function ProviderLane({
             ⚠ {lane.errorMessage}
           </p>
         ) : lane.status === 'empty' ? (
-          <p className="text-sm text-mist">No content returned.</p>
+          <p className="text-sm text-mist">Nenhum conteúdo retornado.</p>
         ) : (
           <Markdown>{lane.text}</Markdown>
         )}
@@ -100,7 +100,7 @@ export function ProviderLane({
         <footer className="flex items-center justify-between border-t border-line px-5 py-3 font-mono text-xs text-mist">
           <span>{countTokens(lane.text)} tokens</span>
           <button type="button" onClick={copy} className="hover:text-bright">
-            copy
+            copiar
           </button>
         </footer>
       )}

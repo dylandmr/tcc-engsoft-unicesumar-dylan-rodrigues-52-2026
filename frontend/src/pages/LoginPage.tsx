@@ -13,26 +13,26 @@ export function LoginPage() {
       <div className="mb-8 flex flex-col items-center gap-2 text-center">
         <Logo />
         <p className="font-body text-sm text-mist">
-          Parallel, side-by-side evaluation of generative AI.
+          Avaliação paralela e lado a lado de IAs generativas.
         </p>
       </div>
 
       <Panel className="w-full max-w-md p-6">
         <p className="mb-4 font-mono text-xs tracking-wider text-ignition">
-          SIGN IN
+          ENTRAR
         </p>
         <form onSubmit={f.submit} className="flex flex-col gap-3">
           <input
-            aria-label="Username"
-            placeholder="username"
+            aria-label="Usuário"
+            placeholder="usuário"
             value={f.username}
             onChange={(e) => f.setUsername(e.target.value)}
             className="rounded-lg border border-line bg-void px-4 py-3 font-body text-bright placeholder:text-mist focus:border-ignition focus:outline-none"
           />
           <input
-            aria-label="Password"
+            aria-label="Senha"
             type="password"
-            placeholder="password"
+            placeholder="senha"
             value={f.password}
             onChange={(e) => f.setPassword(e.target.value)}
             className="rounded-lg border border-line bg-void px-4 py-3 font-body text-bright placeholder:text-mist focus:border-ignition focus:outline-none"
@@ -43,13 +43,13 @@ export function LoginPage() {
             </p>
           )}
           <Button type="submit" disabled={f.submitting} className="mt-1">
-            Enter the arena →
+            Entrar na arena →
           </Button>
         </form>
       </Panel>
 
       <p className="mt-6 font-mono text-xs text-mist">
-        local prototype · your history stays on this machine
+        protótipo local · seu histórico fica nesta máquina
       </p>
     </main>
   )

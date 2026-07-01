@@ -35,12 +35,14 @@ const lane = (over: Partial<LaneState>): LaneState => ({
 
 describe('laneStatusInfo', () => {
   it('flags the first responder', () => {
-    expect(laneStatusInfo(lane({ first: true })).label).toBe('first to respond')
+    expect(laneStatusInfo(lane({ first: true })).label).toBe(
+      'primeiro a responder',
+    )
   })
   it('maps each lane status to a label', () => {
-    expect(laneStatusInfo(lane({ status: 'live' })).label).toMatch(/live/)
-    expect(laneStatusInfo(lane({ status: 'done' })).label).toBe('done')
-    expect(laneStatusInfo(lane({ status: 'empty' })).label).toMatch(/empty/)
+    expect(laneStatusInfo(lane({ status: 'live' })).label).toMatch(/ao vivo/)
+    expect(laneStatusInfo(lane({ status: 'done' })).label).toBe('concluído')
+    expect(laneStatusInfo(lane({ status: 'empty' })).label).toMatch(/vazia/)
     expect(laneStatusInfo(lane({ status: 'error' })).toneClass).toBe(
       'text-error',
     )
@@ -48,7 +50,7 @@ describe('laneStatusInfo', () => {
       'text-timeout',
     )
     expect(laneStatusInfo(lane({ status: 'disabled' })).label).toBe(
-      'not configured',
+      'não configurado',
     )
   })
 })

@@ -106,7 +106,7 @@ describe('ProviderLane', () => {
   it('renders a live lane with a streaming status', () => {
     render(<ProviderLane lane={lane({ status: 'live', elapsedMs: 500 })} />)
     expect(screen.getByText('Claude')).toBeInTheDocument()
-    expect(screen.getByText(/live · streaming/)).toBeInTheDocument()
+    expect(screen.getByText(/ao vivo · transmitindo/)).toBeInTheDocument()
   })
 
   it('renders a done lane with text, footer telemetry and copy', async () => {
@@ -124,15 +124,15 @@ describe('ProviderLane', () => {
       />,
     )
     expect(screen.getByText('0.97s')).toBeInTheDocument()
-    expect(screen.getByText('first to respond')).toBeInTheDocument()
+    expect(screen.getByText('primeiro a responder')).toBeInTheDocument()
     expect(screen.getByText('2 tokens')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'copy' }))
+    await userEvent.click(screen.getByRole('button', { name: 'copiar' }))
     expect(writeText).toHaveBeenCalledWith('two words')
   })
 
   it('renders an empty-response lane distinctly', () => {
     render(<ProviderLane lane={lane({ status: 'empty' })} />)
-    expect(screen.getByText('No content returned.')).toBeInTheDocument()
+    expect(screen.getByText('Nenhum conteúdo retornado.')).toBeInTheDocument()
   })
 
   it('renders the response as formatted markdown, not raw text', () => {
@@ -158,14 +158,14 @@ describe('ProviderLane', () => {
         })}
       />,
     )
-    expect(screen.getByText('not configured')).toBeInTheDocument()
-    expect(screen.getByText(/No API key configured/)).toBeInTheDocument()
+    expect(screen.getByText('não configurado')).toBeInTheDocument()
+    expect(screen.getByText(/Nenhuma chave de API/)).toBeInTheDocument()
     // Not surfaced as an error, and no telemetry/copy footer.
     expect(
       screen.queryByText('provider_not_configured'),
     ).not.toBeInTheDocument()
     expect(
-      screen.queryByRole('button', { name: 'copy' }),
+      screen.queryByRole('button', { name: 'copiar' }),
     ).not.toBeInTheDocument()
   })
 
@@ -176,7 +176,7 @@ describe('ProviderLane', () => {
       />,
     )
     expect(screen.getByText(/rate_limited/)).toBeInTheDocument()
-    expect(screen.getByText('error')).toBeInTheDocument()
+    expect(screen.getByText('erro')).toBeInTheDocument()
   })
 
   it('renders a timeout lane', () => {
@@ -189,6 +189,6 @@ describe('ProviderLane', () => {
       />,
     )
     expect(screen.getByText(/time limit/)).toBeInTheDocument()
-    expect(screen.getByText('timeout')).toBeInTheDocument()
+    expect(screen.getByText('tempo esgotado')).toBeInTheDocument()
   })
 })

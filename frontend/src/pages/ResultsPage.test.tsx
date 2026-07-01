@@ -24,7 +24,7 @@ describe('ResultsPage', () => {
     renderResults({ providers: ['CLAUDE'] })
     expect(screen.getByRole('region', { name: 'Claude' })).toBeInTheDocument()
     await waitFor(() =>
-      expect(screen.getByText('complete · 1 models')).toBeInTheDocument(),
+      expect(screen.getByText('concluído · 1 modelos')).toBeInTheDocument(),
     )
   })
 })

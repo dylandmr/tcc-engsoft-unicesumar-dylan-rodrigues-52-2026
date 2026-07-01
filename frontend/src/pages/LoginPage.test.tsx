@@ -7,14 +7,16 @@ import { renderApp } from '../../testing/render'
 describe('LoginPage', () => {
   it('signs in with valid credentials and routes to the composer', async () => {
     renderApp({ route: '/login' })
-    await userEvent.type(screen.getByLabelText('Username'), 'alice')
-    await userEvent.type(screen.getByLabelText('Password'), 'pw')
+    await userEvent.type(screen.getByLabelText('Usuário'), 'alice')
+    await userEvent.type(screen.getByLabelText('Senha'), 'pw')
     await userEvent.click(
-      screen.getByRole('button', { name: /Enter the arena/ }),
+      screen.getByRole('button', { name: /Entrar na arena/ }),
     )
     await waitFor(() =>
       expect(
-        screen.getByRole('heading', { name: /What should the models answer/ }),
+        screen.getByRole('heading', {
+          name: /O que os modelos devem responder/,
+        }),
       ).toBeInTheDocument(),
     )
   })
@@ -26,13 +28,13 @@ describe('LoginPage', () => {
       ),
     )
     renderApp({ route: '/login' })
-    await userEvent.type(screen.getByLabelText('Username'), 'bad')
-    await userEvent.type(screen.getByLabelText('Password'), 'creds')
+    await userEvent.type(screen.getByLabelText('Usuário'), 'bad')
+    await userEvent.type(screen.getByLabelText('Senha'), 'creds')
     await userEvent.click(
-      screen.getByRole('button', { name: /Enter the arena/ }),
+      screen.getByRole('button', { name: /Entrar na arena/ }),
     )
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      /Invalid username or password/,
+      /Usuário ou senha inválidos/,
     )
   })
 })

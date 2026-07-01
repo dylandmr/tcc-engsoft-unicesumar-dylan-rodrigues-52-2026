@@ -23,14 +23,23 @@ public final class ProviderResultMapper {
         provider, empty ? Outcome.EMPTY : Outcome.SUCCESS, empty ? "" : text, null, responseTimeMs);
   }
 
-  /** A failed call (HTTP error, SDK exception, unconfigured provider). */
+  /**
+   * A failed call (HTTP error, SDK exception, unconfigured provider). The provider's own message is
+   * kept verbatim (may be in the provider's language); only the fallback is localized. The {@code
+   * provider_not_configured} sentinel is passed through by the adapters and must not be translated.
+   */
   public static ProviderResponse error(Provider provider, String message, Long responseTimeMs) {
     return new ProviderResponse(
-        provider, Outcome.ERROR, null, message == null ? "error" : message, responseTimeMs);
+        provider,
+        Outcome.ERROR,
+        null,
+        message == null ? "Erro no provedor." : message,
+        responseTimeMs);
   }
 
   /** A call that exceeded the per-provider response-time limit (FR-012). */
   public static ProviderResponse timeout(Provider provider) {
-    return new ProviderResponse(provider, Outcome.TIMEOUT, null, "timeout", null);
+    return new ProviderResponse(
+        provider, Outcome.TIMEOUT, null, "Sem resposta dentro do tempo limite.", null);
   }
 }

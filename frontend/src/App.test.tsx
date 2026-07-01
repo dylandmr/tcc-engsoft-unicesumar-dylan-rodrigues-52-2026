@@ -7,7 +7,9 @@ describe('App', () => {
     render(<App />)
     await waitFor(() =>
       expect(
-        screen.getByRole('heading', { name: /What should the models answer/ }),
+        screen.getByRole('heading', {
+          name: /O que os modelos devem responder/,
+        }),
       ).toBeInTheDocument(),
     )
   })

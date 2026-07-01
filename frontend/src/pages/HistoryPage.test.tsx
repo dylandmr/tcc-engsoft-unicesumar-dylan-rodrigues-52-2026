@@ -7,7 +7,9 @@ import { renderApp } from '../../testing/render'
 describe('HistoryPage', () => {
   it('shows an empty state when there are no comparisons', async () => {
     renderApp({ route: '/history' })
-    expect(await screen.findByText(/No comparisons yet/)).toBeInTheDocument()
+    expect(
+      await screen.findByText(/Nenhuma comparação ainda/),
+    ).toBeInTheDocument()
   })
 
   it('shows an error state when history fails to load', async () => {
@@ -18,7 +20,7 @@ describe('HistoryPage', () => {
     )
     renderApp({ route: '/history' })
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      /Could not load history/,
+      /Não foi possível carregar o histórico/,
     )
   })
 
@@ -39,7 +41,7 @@ describe('HistoryPage', () => {
     )
     renderApp({ route: '/history' })
     const row = await screen.findByText('My old prompt')
-    expect(screen.getByText('2 min ago')).toBeInTheDocument()
+    expect(screen.getByText('há 2 min')).toBeInTheDocument()
     await userEvent.click(row)
     await waitFor(() =>
       expect(
@@ -50,10 +52,10 @@ describe('HistoryPage', () => {
 
   it('signs out from history', async () => {
     renderApp({ route: '/history' })
-    await screen.findByText(/No comparisons yet/)
-    await userEvent.click(screen.getByRole('button', { name: 'sign out' }))
+    await screen.findByText(/Nenhuma comparação ainda/)
+    await userEvent.click(screen.getByRole('button', { name: 'sair' }))
     await waitFor(() =>
-      expect(screen.getByLabelText('Username')).toBeInTheDocument(),
+      expect(screen.getByLabelText('Usuário')).toBeInTheDocument(),
     )
   })
 })

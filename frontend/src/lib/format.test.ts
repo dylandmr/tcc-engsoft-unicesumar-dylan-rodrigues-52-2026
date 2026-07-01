@@ -22,15 +22,15 @@ describe('relativeTime', () => {
   const ago = (ms: number) => new Date(base - ms).toISOString()
 
   it('handles all coarse buckets', () => {
-    expect(relativeTime(ago(10_000), base)).toBe('just now')
-    expect(relativeTime(ago(5 * 60_000), base)).toBe('5 min ago')
-    expect(relativeTime(ago(60 * 60_000), base)).toBe('1 hour ago')
-    expect(relativeTime(ago(3 * 60 * 60_000), base)).toBe('3 hours ago')
-    expect(relativeTime(ago(24 * 60 * 60_000), base)).toBe('yesterday')
-    expect(relativeTime(ago(3 * 24 * 60 * 60_000), base)).toBe('3 days ago')
+    expect(relativeTime(ago(10_000), base)).toBe('agora')
+    expect(relativeTime(ago(5 * 60_000), base)).toBe('há 5 min')
+    expect(relativeTime(ago(60 * 60_000), base)).toBe('há 1 hora')
+    expect(relativeTime(ago(3 * 60 * 60_000), base)).toBe('há 3 horas')
+    expect(relativeTime(ago(24 * 60 * 60_000), base)).toBe('ontem')
+    expect(relativeTime(ago(3 * 24 * 60 * 60_000), base)).toBe('há 3 dias')
   })
 
   it('defaults the reference time to now', () => {
-    expect(relativeTime(new Date().toISOString())).toBe('just now')
+    expect(relativeTime(new Date().toISOString())).toBe('agora')
   })
 })

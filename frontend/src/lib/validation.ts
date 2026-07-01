@@ -11,11 +11,11 @@ export type ValidationError =
 
 /** User-facing message for each validation code (FR-006). */
 export const VALIDATION_MESSAGES: Record<ValidationError, string> = {
-  empty_prompt: 'Enter a prompt before running a comparison.',
-  prompt_too_long: `Prompt is too long (max ${MAX_PROMPT_LEN} characters).`,
-  no_providers: 'Select at least one model to compare.',
-  too_many_providers: `Select at most ${MAX_PROVIDERS} models.`,
-  duplicate_provider: 'Each model can only be selected once.',
+  empty_prompt: 'Digite um prompt antes de comparar.',
+  prompt_too_long: `O prompt é muito longo (máx. ${MAX_PROMPT_LEN} caracteres).`,
+  no_providers: 'Selecione pelo menos um modelo para comparar.',
+  too_many_providers: `Selecione no máximo ${MAX_PROVIDERS} modelos.`,
+  duplicate_provider: 'Cada modelo só pode ser selecionado uma vez.',
 }
 
 /**

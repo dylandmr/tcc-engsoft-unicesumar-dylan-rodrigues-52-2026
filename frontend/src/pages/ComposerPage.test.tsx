@@ -6,16 +6,18 @@ import { renderApp } from '../../testing/render'
 
 async function reachComposer() {
   renderApp({ route: '/' })
-  await screen.findByRole('heading', { name: /What should the models answer/ })
+  await screen.findByRole('heading', {
+    name: /O que os modelos devem responder/,
+  })
 }
 
 describe('ComposerPage', () => {
   it('blocks an empty prompt with a validation message', async () => {
     await reachComposer()
-    await userEvent.click(
-      screen.getByRole('button', { name: /Run comparison/ }),
+    await userEvent.click(screen.getByRole('button', { name: /Comparar/ }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /Digite um prompt/,
     )
-    expect(await screen.findByRole('alert')).toHaveTextContent(/Enter a prompt/)
   })
 
   it('blocks running with no providers selected', async () => {
@@ -24,21 +26,19 @@ describe('ComposerPage', () => {
       screen.getByLabelText('Prompt'),
       'Why is the sky blue?',
     )
-    await userEvent.click(
-      screen.getByRole('button', { name: /Run comparison/ }),
-    )
+    await userEvent.click(screen.getByRole('button', { name: /Comparar/ }))
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      /at least one model/,
+      /pelo menos um modelo/,
     )
   })
 
   it('toggles a provider on and off', async () => {
     await reachComposer()
-    expect(screen.getByText(/0 CHOSEN/)).toBeInTheDocument()
+    expect(screen.getByText(/0 ESCOLHIDO/)).toBeInTheDocument()
     await userEvent.click(screen.getByRole('checkbox', { name: 'Gemini' }))
-    expect(screen.getByText(/1 CHOSEN/)).toBeInTheDocument()
+    expect(screen.getByText(/1 ESCOLHIDO/)).toBeInTheDocument()
     await userEvent.click(screen.getByRole('checkbox', { name: 'Gemini' }))
-    expect(screen.getByText(/0 CHOSEN/)).toBeInTheDocument()
+    expect(screen.getByText(/0 ESCOLHIDO/)).toBeInTheDocument()
   })
 
   it('prevents selecting a fifth provider', async () => {
@@ -46,7 +46,7 @@ describe('ComposerPage', () => {
     for (const name of ['Gemini', 'ChatGPT', 'Claude', 'Grok']) {
       await userEvent.click(screen.getByRole('checkbox', { name }))
     }
-    expect(screen.getByText(/4 CHOSEN/)).toBeInTheDocument()
+    expect(screen.getByText(/4 ESCOLHIDO/)).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: 'DeepSeek' })).toBeDisabled()
   })
 
@@ -57,9 +57,7 @@ describe('ComposerPage', () => {
       'Explain entanglement',
     )
     await userEvent.click(screen.getByRole('checkbox', { name: 'Claude' }))
-    await userEvent.click(
-      screen.getByRole('button', { name: /Run comparison/ }),
-    )
+    await userEvent.click(screen.getByRole('button', { name: /Comparar/ }))
     await waitFor(() =>
       expect(
         screen.getByRole('region', { name: 'Claude' }),
@@ -79,19 +77,17 @@ describe('ComposerPage', () => {
       'Explain entanglement',
     )
     await userEvent.click(screen.getByRole('checkbox', { name: 'Claude' }))
-    await userEvent.click(
-      screen.getByRole('button', { name: /Run comparison/ }),
-    )
+    await userEvent.click(screen.getByRole('button', { name: /Comparar/ }))
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      /Could not start the comparison/,
+      /Não foi possível iniciar a comparação/,
     )
   })
 
   it('signs out back to the login screen', async () => {
     await reachComposer()
-    await userEvent.click(screen.getByRole('button', { name: 'sign out' }))
+    await userEvent.click(screen.getByRole('button', { name: 'sair' }))
     await waitFor(() =>
-      expect(screen.getByLabelText('Username')).toBeInTheDocument(),
+      expect(screen.getByLabelText('Usuário')).toBeInTheDocument(),
     )
   })
 })

@@ -37,7 +37,7 @@ export function useComposer() {
         state: { providers: created.providers, prompt },
       })
     } catch {
-      setError('Could not start the comparison. Please try again.')
+      setError('Não foi possível iniciar a comparação. Tente novamente.')
       setSubmitting(false)
     }
   }

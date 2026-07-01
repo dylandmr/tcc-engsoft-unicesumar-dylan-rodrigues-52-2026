@@ -23,19 +23,19 @@ export function ComposerPage() {
       <Backdrop />
       <TopBar>
         <Link to="/history" className="hover:text-bright">
-          history
+          histórico
         </Link>
         <button onClick={handleSignOut} className="hover:text-bright">
-          sign out
+          sair
         </button>
       </TopBar>
 
       <main className="mx-auto max-w-3xl px-6 pt-16">
         <p className="font-mono text-xs tracking-wider text-ignition">
-          NEW COMPARISON
+          NOVA COMPARAÇÃO
         </p>
         <h1 className="mt-3 font-display text-4xl font-medium text-bright">
-          What should the models answer?
+          O que os modelos devem responder?
         </h1>
 
         <form onSubmit={c.run} className="mt-6 flex flex-col gap-6">
@@ -43,7 +43,7 @@ export function ComposerPage() {
 
           <div>
             <p className="font-mono text-xs tracking-wider text-mist">
-              SELECT UP TO 4 MODELS · {c.selected.length} CHOSEN
+              SELECIONE ATÉ 4 MODELOS · {c.selected.length} ESCOLHIDO(S)
             </p>
             <div className="mt-3 flex flex-wrap gap-3">
               {PROVIDERS.map((meta) => {
@@ -69,10 +69,10 @@ export function ComposerPage() {
 
           <div className="flex items-center justify-between">
             <Button type="submit" disabled={c.submitting}>
-              Run comparison →
+              Comparar →
             </Button>
             <span className="font-mono text-xs text-mist">
-              streamed live, side by side
+              transmitido ao vivo, lado a lado
             </span>
           </div>
         </form>

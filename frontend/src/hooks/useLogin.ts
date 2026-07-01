@@ -20,7 +20,7 @@ export function useLogin() {
       navigate('/', { replace: true })
     } catch {
       // Non-revealing message (FR-003).
-      setError('Invalid username or password.')
+      setError('Usuário ou senha inválidos.')
       setSubmitting(false)
     }
   }

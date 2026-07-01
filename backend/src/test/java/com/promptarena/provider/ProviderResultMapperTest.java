@@ -50,7 +50,7 @@ class ProviderResultMapperTest {
     ProviderResponse response = ProviderResultMapper.error(Provider.GROK, null, null);
 
     assertThat(response.outcome()).isEqualTo(Outcome.ERROR);
-    assertThat(response.errorMessage()).isEqualTo("error");
+    assertThat(response.errorMessage()).isEqualTo("Erro no provedor.");
     assertThat(response.responseTimeMs()).isNull();
   }
 
@@ -60,7 +60,7 @@ class ProviderResultMapperTest {
 
     assertThat(response.outcome()).isEqualTo(Outcome.TIMEOUT);
     assertThat(response.text()).isNull();
-    assertThat(response.errorMessage()).isEqualTo("timeout");
+    assertThat(response.errorMessage()).isEqualTo("Sem resposta dentro do tempo limite.");
     assertThat(response.responseTimeMs()).isNull();
   }
 }

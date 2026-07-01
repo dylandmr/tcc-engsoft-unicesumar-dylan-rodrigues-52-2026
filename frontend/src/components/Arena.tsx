@@ -18,7 +18,7 @@ export function Arena({ comparisonId, providers, prompt }: ArenaProps) {
   return (
     <div className="flex h-screen flex-col">
       <header className="flex items-center justify-between gap-4 px-8 py-5">
-        <Link to="/" aria-label="Home">
+        <Link to="/" aria-label="Início">
           <Logo />
         </Link>
         <p className="min-w-0 max-w-2xl flex-1 truncate text-center font-body text-lg text-bright md:text-xl">
@@ -31,7 +31,7 @@ export function Arena({ comparisonId, providers, prompt }: ArenaProps) {
               state.done ? 'bg-mist' : 'bg-ignition',
             )}
           />
-          {state.done ? 'complete' : 'live'} · {state.order.length} models
+          {state.done ? 'concluído' : 'ao vivo'} · {state.order.length} modelos
         </span>
       </header>
 

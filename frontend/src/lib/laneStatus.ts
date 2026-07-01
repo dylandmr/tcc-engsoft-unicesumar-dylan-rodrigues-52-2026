@@ -8,19 +8,19 @@ export interface LaneStatusInfo {
 /** Map a lane to its telemetry status line (label + tone colour). */
 export function laneStatusInfo(lane: LaneState): LaneStatusInfo {
   if (lane.first)
-    return { label: 'first to respond', toneClass: 'text-ignition' }
+    return { label: 'primeiro a responder', toneClass: 'text-ignition' }
   switch (lane.status) {
     case 'live':
-      return { label: 'live · streaming', toneClass: 'text-ignition' }
+      return { label: 'ao vivo · transmitindo', toneClass: 'text-ignition' }
     case 'done':
-      return { label: 'done', toneClass: 'text-mist' }
+      return { label: 'concluído', toneClass: 'text-mist' }
     case 'empty':
-      return { label: 'empty response', toneClass: 'text-mist' }
+      return { label: 'resposta vazia', toneClass: 'text-mist' }
     case 'error':
-      return { label: 'error', toneClass: 'text-error' }
+      return { label: 'erro', toneClass: 'text-error' }
     case 'timeout':
-      return { label: 'timeout', toneClass: 'text-timeout' }
+      return { label: 'tempo esgotado', toneClass: 'text-timeout' }
     case 'disabled':
-      return { label: 'not configured', toneClass: 'text-mist' }
+      return { label: 'não configurado', toneClass: 'text-mist' }
   }
 }

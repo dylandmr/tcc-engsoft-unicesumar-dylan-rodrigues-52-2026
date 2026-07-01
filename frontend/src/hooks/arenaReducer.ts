@@ -120,7 +120,11 @@ export function arenaReducer(
         const lane = state.lanes[id]
         lanes[id] =
           lane.status === 'live'
-            ? { ...lane, status: 'error', errorMessage: 'stream_failed' }
+            ? {
+                ...lane,
+                status: 'error',
+                errorMessage: 'Falha na transmissão.',
+              }
             : lane
       }
       return { ...state, lanes, done: true }

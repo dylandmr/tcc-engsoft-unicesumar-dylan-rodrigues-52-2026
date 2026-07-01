@@ -6,7 +6,7 @@ import { Logo } from './Logo'
 export function TopBar({ children }: { children?: ReactNode }) {
   return (
     <header className="flex items-center justify-between px-8 py-6">
-      <Link to="/" aria-label="Home">
+      <Link to="/" aria-label="Início">
         <Logo />
       </Link>
       <nav className="flex items-center gap-6 font-mono text-sm text-mist">

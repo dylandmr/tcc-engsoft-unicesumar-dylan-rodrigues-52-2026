@@ -31,7 +31,7 @@ function HistoryRow({ item }: { item: ComparisonSummary }) {
                 className={cn('size-2 rounded-full', PROVIDER_STYLES[p].dot)}
               />
             ))}
-            {item.providers.length} models
+            {item.providers.length} modelos
           </span>
         </span>
         <span className="shrink-0 font-mono text-xs text-mist">
@@ -56,30 +56,30 @@ export function HistoryPage() {
     <div className="min-h-screen">
       <TopBar>
         <Link to="/" className="text-ignition hover:brightness-110">
-          new comparison
+          nova comparação
         </Link>
         <button onClick={handleSignOut} className="hover:text-bright">
-          sign out
+          sair
         </button>
       </TopBar>
 
       <main className="mx-auto max-w-4xl px-6">
         <p className="font-mono text-xs tracking-wider text-ignition">
-          HISTORY
+          HISTÓRICO
         </p>
         <h1 className="mt-2 mb-8 font-display text-4xl font-medium text-bright">
-          Past comparisons
+          Comparações anteriores
         </h1>
 
         {failed ? (
           <p role="alert" className="font-body text-error">
-            Could not load history.
+            Não foi possível carregar o histórico.
           </p>
         ) : items === null ? (
-          <p className="font-body text-mist">Loading…</p>
+          <p className="font-body text-mist">Carregando…</p>
         ) : items.length === 0 ? (
           <Panel className="p-8 text-center font-body text-mist">
-            No comparisons yet. Run your first one.
+            Nenhuma comparação ainda. Faça a primeira.
           </Panel>
         ) : (
           <ul className="flex flex-col gap-3">
