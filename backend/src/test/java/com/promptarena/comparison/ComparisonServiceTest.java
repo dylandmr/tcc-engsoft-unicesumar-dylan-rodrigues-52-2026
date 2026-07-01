@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import com.promptarena.dto.PromptRequest;
 import com.promptarena.dto.ProviderResponse;
 import com.promptarena.dto.ResultEvent;
+import com.promptarena.dto.StreamTelemetry;
 import com.promptarena.model.Comparison;
 import com.promptarena.model.Outcome;
 import com.promptarena.model.Provider;
@@ -24,6 +25,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
@@ -76,7 +78,8 @@ class ComparisonServiceTest {
   }
 
   private static ProviderResponse ok(Provider id) {
-    return ProviderResultMapper.success(id, "answer-" + id, 10L);
+    return ProviderResultMapper.success(
+        id, "answer-" + id, 10L, new StreamTelemetry(3L, 7L, 11L, "model-" + id));
   }
 
   private void register(Map<Provider, LlmProvider> adapters) {
@@ -91,7 +94,8 @@ class ComparisonServiceTest {
             Provider.CLAUDE, adapter(Provider.CLAUDE, ComparisonServiceTest::ok),
             Provider.CHATGPT, adapter(Provider.CHATGPT, ComparisonServiceTest::ok),
             Provider.GEMINI, adapter(Provider.GEMINI, ComparisonServiceTest::ok)));
-    List<ProviderResponse> emitted = new ArrayList<>();
+    // Results arrive concurrently from each provider's virtual thread — collect thread-safely.
+    List<ProviderResponse> emitted = new CopyOnWriteArrayList<>();
 
     List<ProviderResponse> responses =
         service(45_000).fanOut(providers, new PromptRequest("hi"), (p, t) -> {}, emitted::add);
@@ -198,6 +202,29 @@ class ComparisonServiceTest {
   }
 
   @Test
+  void executePersistsTelemetryAndEmitsItOnTheResultEvent() {
+    User user = new User("alice", "hash");
+    Comparison comparison = new Comparison(user, "prompt", List.of(Provider.CLAUDE));
+    when(comparisons.findById("c1")).thenReturn(Optional.of(comparison));
+    register(Map.of(Provider.CLAUDE, adapter(Provider.CLAUDE, ComparisonServiceTest::ok)));
+    List<ResultEvent> events = new ArrayList<>();
+
+    service(45_000).execute("c1", (p, t) -> {}, events::add);
+
+    ProviderResult persisted = comparison.getResults().get(0);
+    assertThat(persisted.getFirstTokenMs()).isEqualTo(3L);
+    assertThat(persisted.getInputTokens()).isEqualTo(7L);
+    assertThat(persisted.getOutputTokens()).isEqualTo(11L);
+    assertThat(persisted.getModel()).isEqualTo("model-" + Provider.CLAUDE);
+
+    ResultEvent event = events.get(0);
+    assertThat(event.firstTokenMs()).isEqualTo(3L);
+    assertThat(event.inputTokens()).isEqualTo(7L);
+    assertThat(event.outputTokens()).isEqualTo(11L);
+    assertThat(event.model()).isEqualTo("model-" + Provider.CLAUDE);
+  }
+
+  @Test
   void executeThrowsWhenComparisonMissing() {
     when(comparisons.findById("gone")).thenReturn(Optional.empty());
 
@@ -206,10 +233,12 @@ class ComparisonServiceTest {
   }
 
   @Test
-  void replayEmitsPersistedResults() {
+  void replayEmitsPersistedResultsIncludingTelemetry() {
     User user = new User("alice", "hash");
     Comparison comparison = new Comparison(user, "prompt", List.of(Provider.CLAUDE));
-    comparison.addResult(new ProviderResult(Provider.CLAUDE, Outcome.SUCCESS, "answer", null, 12L));
+    comparison.addResult(
+        new ProviderResult(
+            Provider.CLAUDE, Outcome.SUCCESS, "answer", null, 12L, 4L, 8L, 15L, "model-x"));
     comparison.addResult(
         new ProviderResult(Provider.GEMINI, Outcome.ERROR, null, "rate_limited", null));
     when(comparisons.findById("c1")).thenReturn(Optional.of(comparison));
@@ -221,6 +250,12 @@ class ComparisonServiceTest {
     assertThat(events)
         .extracting(ResultEvent::provider)
         .containsExactly(Provider.CLAUDE, Provider.GEMINI);
+    assertThat(events.get(0).firstTokenMs()).isEqualTo(4L);
+    assertThat(events.get(0).inputTokens()).isEqualTo(8L);
+    assertThat(events.get(0).outputTokens()).isEqualTo(15L);
+    assertThat(events.get(0).model()).isEqualTo("model-x");
+    assertThat(events.get(1).firstTokenMs()).isNull();
+    assertThat(events.get(1).model()).isNull();
   }
 
   private Map<Provider, Outcome> outcomesByProvider(

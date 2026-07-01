@@ -38,7 +38,8 @@ class RepositoryIntegrationTest {
 
     Comparison comparison = new Comparison(alice, "explain entanglement");
     comparison.addResult(
-        new ProviderResult(Provider.CLAUDE, Outcome.SUCCESS, "answer", null, 1840L));
+        new ProviderResult(
+            Provider.CLAUDE, Outcome.SUCCESS, "answer", null, 1840L, 320L, 12L, 256L, "claude-x"));
     comparison.addResult(
         new ProviderResult(Provider.GEMINI, Outcome.TIMEOUT, null, "Timed out", null));
     comparison.markComplete();
@@ -46,6 +47,15 @@ class RepositoryIntegrationTest {
 
     assertThat(saved.getStatus()).isEqualTo(Status.COMPLETE);
     assertThat(saved.getResults()).hasSize(2);
+
+    ProviderResult withTelemetry = saved.getResults().get(0);
+    assertThat(withTelemetry.getFirstTokenMs()).isEqualTo(320L);
+    assertThat(withTelemetry.getInputTokens()).isEqualTo(12L);
+    assertThat(withTelemetry.getOutputTokens()).isEqualTo(256L);
+    assertThat(withTelemetry.getModel()).isEqualTo("claude-x");
+    ProviderResult withoutTelemetry = saved.getResults().get(1);
+    assertThat(withoutTelemetry.getFirstTokenMs()).isNull();
+    assertThat(withoutTelemetry.getModel()).isNull();
 
     List<Comparison> aliceHistory = comparisons.findByUserOrderByCreatedAtDesc(alice);
     assertThat(aliceHistory).extracting(Comparison::getId).containsExactly(saved.getId());

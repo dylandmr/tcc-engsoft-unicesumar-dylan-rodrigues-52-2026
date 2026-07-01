@@ -51,13 +51,19 @@ class OpenAiCompatibleProviderTest {
   }
 
   /**
-   * A complete streaming (SSE) chat-completion response: the given content deltas in order, then
-   * the terminal chunk carrying {@code finish_reason: "stop"} and {@code [DONE]} (as the live API
-   * sends).
+   * A complete streaming (SSE) chat-completion response, mirroring the live API with {@code
+   * stream_options.include_usage}: the given content deltas in order, the chunk carrying {@code
+   * finish_reason: "stop"}, then a terminal usage chunk whose {@code choices} array is EMPTY, and
+   * finally {@code [DONE]}. Every chunk reports the exact {@code model}.
    */
   private void stubChatStream(String... deltas) {
     StringBuilder body = deltaChunks(deltas);
-    body.append("data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n")
+    body.append(
+            "data: {\"model\":\"gpt-test-2024\",\"choices\":[{\"index\":0,\"delta\":{},"
+                + "\"finish_reason\":\"stop\"}]}\n\n")
+        .append(
+            "data: {\"model\":\"gpt-test-2024\",\"choices\":[],\"usage\":{\"prompt_tokens\":9,"
+                + "\"completion_tokens\":21,\"total_tokens\":30}}\n\n")
         .append("data: [DONE]\n\n");
     stubStream(body);
   }
@@ -73,7 +79,8 @@ class OpenAiCompatibleProviderTest {
   private static StringBuilder deltaChunks(String... deltas) {
     StringBuilder body = new StringBuilder();
     for (String delta : deltas) {
-      body.append("data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"")
+      body.append(
+              "data: {\"model\":\"gpt-test-2024\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"")
           .append(delta)
           .append("\"}}]}\n\n");
     }
@@ -116,6 +123,20 @@ class OpenAiCompatibleProviderTest {
   }
 
   @Test
+  void streamedSuccessHarvestsUsageModelAndTimeToFirstToken() {
+    stubChatStream("Hello", " there");
+
+    ProviderResponse response = provider("test-key").stream(new PromptRequest("hi"), token -> {});
+
+    // TTFT was stamped on the first delta, on the same clock as the total latency.
+    assertThat(response.firstTokenMs()).isNotNull().isBetween(0L, response.responseTimeMs());
+    // Usage rides the terminal chunk whose choices array is empty — chunks are read whole.
+    assertThat(response.inputTokens()).isEqualTo(9L);
+    assertThat(response.outputTokens()).isEqualTo(21L);
+    assertThat(response.model()).isEqualTo("gpt-test-2024");
+  }
+
+  @Test
   void streamThatEndsWithoutAFinishReasonIsMappedToError() {
     // A mid-answer drop: deltas stream in, but the finish_reason chunk never arrives.
     stubIncompleteChatStream("The answer starts", " and is then cut");
@@ -124,10 +145,12 @@ class OpenAiCompatibleProviderTest {
     ProviderResponse response = provider("test-key").stream(new PromptRequest("hi"), tokens::add);
 
     // The partial deltas still stream to the caller, but the result is a truncation error — never a
-    // partial answer dressed up as a complete SUCCESS.
+    // partial answer dressed up as a complete SUCCESS. A truncated stream carries no telemetry.
     assertThat(tokens).containsExactly("The answer starts", " and is then cut");
     assertThat(response.outcome()).isEqualTo(Outcome.ERROR);
     assertThat(response.errorMessage()).contains("interrompida");
+    assertThat(response.firstTokenMs()).isNull();
+    assertThat(response.model()).isNull();
   }
 
   @Test

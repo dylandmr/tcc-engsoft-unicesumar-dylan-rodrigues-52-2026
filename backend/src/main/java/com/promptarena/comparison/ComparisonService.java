@@ -70,7 +70,11 @@ public class ComparisonService {
               response.outcome(),
               response.text(),
               response.errorMessage(),
-              response.responseTimeMs()));
+              response.responseTimeMs(),
+              response.firstTokenMs(),
+              response.inputTokens(),
+              response.outputTokens(),
+              response.model()));
     }
     comparison.markComplete();
     comparisons.save(comparison);
@@ -144,7 +148,11 @@ public class ComparisonService {
         response.outcome(),
         response.text(),
         response.errorMessage(),
-        response.responseTimeMs());
+        response.responseTimeMs(),
+        response.firstTokenMs(),
+        response.inputTokens(),
+        response.outputTokens(),
+        response.model());
   }
 
   private static ResultEvent toEvent(ProviderResult result) {
@@ -153,6 +161,10 @@ public class ComparisonService {
         result.getOutcome(),
         result.getResponseText(),
         result.getErrorMessage(),
-        result.getResponseTimeMs());
+        result.getResponseTimeMs(),
+        result.getFirstTokenMs(),
+        result.getInputTokens(),
+        result.getOutputTokens(),
+        result.getModel());
   }
 }

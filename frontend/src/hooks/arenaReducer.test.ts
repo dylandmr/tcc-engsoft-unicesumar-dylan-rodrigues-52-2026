@@ -8,6 +8,10 @@ const result = (over: Partial<ProviderResult>): ProviderResult => ({
   responseText: 'hi',
   errorMessage: null,
   responseTimeMs: 1840,
+  firstTokenMs: null,
+  inputTokens: null,
+  outputTokens: null,
+  model: null,
   ...over,
 })
 

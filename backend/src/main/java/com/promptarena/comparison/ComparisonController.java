@@ -173,6 +173,10 @@ public class ComparisonController {
         result.getOutcome(),
         result.getResponseText(),
         result.getErrorMessage(),
-        result.getResponseTimeMs());
+        result.getResponseTimeMs(),
+        result.getFirstTokenMs(),
+        result.getInputTokens(),
+        result.getOutputTokens(),
+        result.getModel());
   }
 }

@@ -54,6 +54,9 @@ class GeminiProviderTest {
   /**
    * A complete streaming (SSE) generateContent response: the given text deltas in order, with the
    * model's terminal {@code finishReason: STOP} stamped on the last chunk (as the live API does).
+   * Mirroring the live API, every chunk reports {@code modelVersion} and a {@code usageMetadata}
+   * with the prompt count, while the final output count ({@code candidatesTokenCount}) only arrives
+   * on the terminal chunk.
    */
   private void stubGenerateStream(String... deltas) {
     stubStream(true, deltas);
@@ -70,13 +73,20 @@ class GeminiProviderTest {
   private void stubStream(boolean complete, String... deltas) {
     StringBuilder body = new StringBuilder();
     for (int i = 0; i < deltas.length; i++) {
+      boolean terminal = complete && i == deltas.length - 1;
       body.append("data: {\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"")
           .append(deltas[i])
           .append("\"}]}");
-      if (complete && i == deltas.length - 1) {
+      if (terminal) {
         body.append(",\"finishReason\":\"STOP\"");
       }
-      body.append("}]}\n\n");
+      body.append("}],\"usageMetadata\":{\"promptTokenCount\":7");
+      if (terminal) {
+        body.append(",\"candidatesTokenCount\":12,\"totalTokenCount\":19");
+      } else {
+        body.append(",\"totalTokenCount\":7");
+      }
+      body.append("},\"modelVersion\":\"gemini-test-001\"}\n\n");
     }
     server.stubFor(
         post(anyUrl())
@@ -111,6 +121,20 @@ class GeminiProviderTest {
   }
 
   @Test
+  void streamedSuccessHarvestsUsageModelAndTimeToFirstToken() {
+    stubGenerateStream("Hello", " from", " Gemini");
+
+    ProviderResponse response = provider("test-key").stream(new PromptRequest("hi"), token -> {});
+
+    // TTFT was stamped on the first delta, on the same clock as the total latency.
+    assertThat(response.firstTokenMs()).isNotNull().isBetween(0L, response.responseTimeMs());
+    // The last non-empty usage values win — the terminal chunk carries the final counts.
+    assertThat(response.inputTokens()).isEqualTo(7L);
+    assertThat(response.outputTokens()).isEqualTo(12L);
+    assertThat(response.model()).isEqualTo("gemini-test-001");
+  }
+
+  @Test
   void streamThatEndsWithoutAFinishReasonIsMappedToError() {
     // A mid-answer drop: deltas stream in, but the terminal finishReason chunk never arrives.
     stubIncompleteStream("A resposta começa", " e então é cortada");
@@ -119,10 +143,12 @@ class GeminiProviderTest {
     ProviderResponse response = provider("test-key").stream(new PromptRequest("hi"), tokens::add);
 
     // The partial deltas still stream to the caller, but the result is a truncation error — never a
-    // partial answer dressed up as a complete SUCCESS.
+    // partial answer dressed up as a complete SUCCESS. A truncated stream carries no telemetry.
     assertThat(tokens).containsExactly("A resposta começa", " e então é cortada");
     assertThat(response.outcome()).isEqualTo(Outcome.ERROR);
     assertThat(response.errorMessage()).contains("interrompida");
+    assertThat(response.firstTokenMs()).isNull();
+    assertThat(response.model()).isNull();
   }
 
   @Test

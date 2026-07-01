@@ -1,5 +1,6 @@
 package com.promptarena.comparison;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -148,11 +149,20 @@ class ComparisonEndpointTest {
   }
 
   @Test
-  void detailReflectsRecordedResults() throws Exception {
+  void detailReflectsRecordedResultsIncludingTelemetry() throws Exception {
     User demo = users.findByUsernameIgnoreCase("demo").orElseThrow();
     Comparison comparison = new Comparison(demo, "saved prompt", List.of(Provider.CLAUDE));
     comparison.addResult(
-        new ProviderResult(Provider.CLAUDE, Outcome.SUCCESS, "the answer", null, 1840L));
+        new ProviderResult(
+            Provider.CLAUDE,
+            Outcome.SUCCESS,
+            "the answer",
+            null,
+            1840L,
+            320L,
+            12L,
+            256L,
+            "claude-test-20250101"));
     comparison.addResult(
         new ProviderResult(Provider.GEMINI, Outcome.ERROR, null, "rate_limited", null));
     comparison.markComplete();
@@ -165,8 +175,14 @@ class ComparisonEndpointTest {
         .andExpect(jsonPath("$.results[0].outcome").value("SUCCESS"))
         .andExpect(jsonPath("$.results[0].responseText").value("the answer"))
         .andExpect(jsonPath("$.results[0].responseTimeMs").value(1840))
+        .andExpect(jsonPath("$.results[0].firstTokenMs").value(320))
+        .andExpect(jsonPath("$.results[0].inputTokens").value(12))
+        .andExpect(jsonPath("$.results[0].outputTokens").value(256))
+        .andExpect(jsonPath("$.results[0].model").value("claude-test-20250101"))
         .andExpect(jsonPath("$.results[1].outcome").value("ERROR"))
-        .andExpect(jsonPath("$.results[1].errorMessage").value("rate_limited"));
+        .andExpect(jsonPath("$.results[1].errorMessage").value("rate_limited"))
+        .andExpect(jsonPath("$.results[1].firstTokenMs").value(nullValue()))
+        .andExpect(jsonPath("$.results[1].model").value(nullValue()));
   }
 
   @Test

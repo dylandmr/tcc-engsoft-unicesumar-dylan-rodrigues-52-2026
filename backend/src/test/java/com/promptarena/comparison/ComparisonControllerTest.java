@@ -50,7 +50,8 @@ class ComparisonControllerTest {
   }
 
   private static ResultEvent sampleEvent() {
-    return new ResultEvent(Provider.CLAUDE, Outcome.SUCCESS, "answer", null, 10L);
+    return new ResultEvent(
+        Provider.CLAUDE, Outcome.SUCCESS, "answer", null, 10L, 2L, 5L, 9L, "model-x");
   }
 
   @Test

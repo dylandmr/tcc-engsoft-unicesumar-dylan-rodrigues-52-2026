@@ -10,11 +10,13 @@ import com.anthropic.models.messages.RawMessageStreamEvent;
 import com.anthropic.models.messages.TextDelta;
 import com.promptarena.dto.PromptRequest;
 import com.promptarena.dto.ProviderResponse;
+import com.promptarena.dto.StreamTelemetry;
 import com.promptarena.model.Provider;
 import com.promptarena.provider.LlmProvider;
 import com.promptarena.provider.ProviderResultMapper;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
@@ -59,6 +61,13 @@ public final class AnthropicProvider implements LlmProvider {
       return ProviderResultMapper.error(Provider.CLAUDE, "provider_not_configured", null);
     }
     long start = System.nanoTime();
+    // Telemetry (FR-019). TTFT is stamped here, against this adapter's own start, so it shares the
+    // clock epoch of responseTimeMs. message_start carries input usage + the exact model;
+    // message_delta carries the CUMULATIVE output token count, so the last one seen is the total.
+    AtomicReference<Long> firstTokenMs = new AtomicReference<>();
+    AtomicReference<Long> inputTokens = new AtomicReference<>();
+    AtomicReference<Long> outputTokens = new AtomicReference<>();
+    AtomicReference<String> reportedModel = new AtomicReference<>();
     try {
       MessageCreateParams params =
           MessageCreateParams.builder()
@@ -79,19 +88,36 @@ public final class AnthropicProvider implements LlmProvider {
                     completed.set(true);
                   }
                   event
+                      .messageStart()
+                      .ifPresent(
+                          messageStart -> {
+                            inputTokens.set(messageStart.message().usage().inputTokens());
+                            reportedModel.set(messageStart.message().model().asString());
+                          });
+                  event
+                      .messageDelta()
+                      .ifPresent(
+                          messageDelta -> outputTokens.set(messageDelta.usage().outputTokens()));
+                  event
                       .contentBlockDelta()
                       .map(RawContentBlockDeltaEvent::delta)
                       .flatMap(RawContentBlockDelta::text)
                       .map(TextDelta::text)
                       .ifPresent(
                           delta -> {
+                            firstTokenMs.compareAndSet(null, elapsedMs(start));
                             full.append(delta);
                             onToken.accept(delta);
                           });
                 });
       }
       return completed.get()
-          ? ProviderResultMapper.success(Provider.CLAUDE, full.toString(), elapsedMs(start))
+          ? ProviderResultMapper.success(
+              Provider.CLAUDE,
+              full.toString(),
+              elapsedMs(start),
+              new StreamTelemetry(
+                  firstTokenMs.get(), inputTokens.get(), outputTokens.get(), reportedModel.get()))
           : ProviderResultMapper.truncated(Provider.CLAUDE, elapsedMs(start));
     } catch (RuntimeException ex) {
       return ProviderResultMapper.error(Provider.CLAUDE, ex.getMessage(), elapsedMs(start));

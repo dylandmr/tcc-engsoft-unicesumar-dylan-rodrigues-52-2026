@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 import com.promptarena.comparison.ComparisonService;
 import com.promptarena.dto.PromptRequest;
 import com.promptarena.dto.ProviderResponse;
+import com.promptarena.dto.StreamTelemetry;
 import com.promptarena.model.Comparison;
 import com.promptarena.model.Outcome;
 import com.promptarena.model.Provider;
@@ -65,7 +66,14 @@ class PersistenceTest {
 
     when(registry.get(Provider.CLAUDE))
         .thenReturn(
-            adapter(Provider.CLAUDE, id -> ProviderResultMapper.success(id, "the answer", 12L)));
+            adapter(
+                Provider.CLAUDE,
+                id ->
+                    ProviderResultMapper.success(
+                        id,
+                        "the answer",
+                        12L,
+                        new StreamTelemetry(3L, 7L, 11L, "claude-test-20250101"))));
     when(registry.get(Provider.GEMINI))
         .thenReturn(
             adapter(
@@ -92,5 +100,17 @@ class PersistenceTest {
     assertThat(failed.getProvider()).isEqualTo(Provider.GEMINI);
     assertThat(failed.getErrorMessage()).contains("rate_limited");
     assertThat(failed.getResponseText()).isNull();
+    assertThat(failed.getFirstTokenMs()).isNull();
+    assertThat(failed.getModel()).isNull();
+
+    ProviderResult succeeded =
+        saved.getResults().stream()
+            .filter(result -> result.getOutcome() == Outcome.SUCCESS)
+            .findFirst()
+            .orElseThrow();
+    assertThat(succeeded.getFirstTokenMs()).isEqualTo(3L);
+    assertThat(succeeded.getInputTokens()).isEqualTo(7L);
+    assertThat(succeeded.getOutputTokens()).isEqualTo(11L);
+    assertThat(succeeded.getModel()).isEqualTo("claude-test-20250101");
   }
 }

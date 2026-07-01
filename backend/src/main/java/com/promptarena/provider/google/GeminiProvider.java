@@ -10,12 +10,14 @@ import com.google.genai.types.HttpRetryOptions;
 import com.google.genai.types.ThinkingConfig;
 import com.promptarena.dto.PromptRequest;
 import com.promptarena.dto.ProviderResponse;
+import com.promptarena.dto.StreamTelemetry;
 import com.promptarena.model.Provider;
 import com.promptarena.provider.LlmProvider;
 import com.promptarena.provider.ProviderResultMapper;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
@@ -69,6 +71,13 @@ public final class GeminiProvider implements LlmProvider {
       return ProviderResultMapper.error(Provider.GEMINI, "provider_not_configured", null);
     }
     long start = System.nanoTime();
+    // Telemetry (FR-019). TTFT is stamped here, against this adapter's own start, so it shares the
+    // clock epoch of responseTimeMs. Usage counts grow across chunks and are final on the terminal
+    // chunk — the last non-empty value wins.
+    AtomicReference<Long> firstTokenMs = new AtomicReference<>();
+    AtomicReference<Long> inputTokens = new AtomicReference<>();
+    AtomicReference<Long> outputTokens = new AtomicReference<>();
+    AtomicReference<String> modelVersion = new AtomicReference<>();
     try {
       StringBuilder full = new StringBuilder();
       boolean completed = false;
@@ -78,9 +87,20 @@ public final class GeminiProvider implements LlmProvider {
           Optional.ofNullable(chunk.text())
               .ifPresent(
                   delta -> {
+                    firstTokenMs.compareAndSet(null, elapsedMs(start));
                     full.append(delta);
                     onToken.accept(delta);
                   });
+          chunk
+              .usageMetadata()
+              .ifPresent(
+                  usage -> {
+                    usage.promptTokenCount().ifPresent(count -> inputTokens.set(count.longValue()));
+                    usage
+                        .candidatesTokenCount()
+                        .ifPresent(count -> outputTokens.set(count.longValue()));
+                  });
+          chunk.modelVersion().ifPresent(modelVersion::set);
           // The model stamps a finish reason on its terminal chunk; if the loop ends without one,
           // the stream dropped mid-answer (no SDK retry — attempts(1)) and the text is partial.
           if (hasFinishReason(chunk)) {
@@ -89,7 +109,12 @@ public final class GeminiProvider implements LlmProvider {
         }
       }
       return completed
-          ? ProviderResultMapper.success(Provider.GEMINI, full.toString(), elapsedMs(start))
+          ? ProviderResultMapper.success(
+              Provider.GEMINI,
+              full.toString(),
+              elapsedMs(start),
+              new StreamTelemetry(
+                  firstTokenMs.get(), inputTokens.get(), outputTokens.get(), modelVersion.get()))
           : ProviderResultMapper.truncated(Provider.GEMINI, elapsedMs(start));
     } catch (RuntimeException ex) {
       return ProviderResultMapper.error(Provider.GEMINI, ex.getMessage(), elapsedMs(start));

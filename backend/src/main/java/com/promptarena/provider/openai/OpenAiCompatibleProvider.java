@@ -5,13 +5,16 @@ import com.openai.client.okhttp.OpenAIOkHttpClient;
 import com.openai.core.http.StreamResponse;
 import com.openai.models.chat.completions.ChatCompletionChunk;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
+import com.openai.models.chat.completions.ChatCompletionStreamOptions;
 import com.promptarena.dto.PromptRequest;
 import com.promptarena.dto.ProviderResponse;
+import com.promptarena.dto.StreamTelemetry;
 import com.promptarena.model.Provider;
 import com.promptarena.provider.LlmProvider;
 import com.promptarena.provider.ProviderResultMapper;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
@@ -62,37 +65,66 @@ public final class OpenAiCompatibleProvider implements LlmProvider {
       return ProviderResultMapper.error(id, "provider_not_configured", null);
     }
     long start = System.nanoTime();
+    // Telemetry (FR-019). TTFT is stamped here, against this adapter's own start, so it shares the
+    // clock epoch of responseTimeMs. With include_usage, the API appends a terminal chunk carrying
+    // usage and an EMPTY choices array — so chunks are iterated whole, never just their choices.
+    AtomicReference<Long> firstTokenMs = new AtomicReference<>();
+    AtomicReference<Long> inputTokens = new AtomicReference<>();
+    AtomicReference<Long> outputTokens = new AtomicReference<>();
+    AtomicReference<String> reportedModel = new AtomicReference<>();
     try {
       ChatCompletionCreateParams params =
           ChatCompletionCreateParams.builder()
               .model(model)
               .addUserMessage(request.prompt())
+              .streamOptions(ChatCompletionStreamOptions.builder().includeUsage(true).build())
               .build();
       StringBuilder full = new StringBuilder();
       AtomicBoolean completed = new AtomicBoolean(false);
       try (StreamResponse<ChatCompletionChunk> chunks =
           client.chat().completions().createStreaming(params)) {
         chunks.stream()
-            .flatMap(chunk -> chunk.choices().stream())
             .forEach(
-                choice -> {
-                  choice
-                      .delta()
-                      .content()
+                chunk -> {
+                  // Read via the raw JSON field: some OpenAI-compatible backends omit `model` on a
+                  // chunk, and telemetry must never turn a good answer into an error.
+                  chunk._model().asString().ifPresent(reportedModel::set);
+                  chunk
+                      .usage()
                       .ifPresent(
-                          delta -> {
-                            full.append(delta);
-                            onToken.accept(delta);
+                          usage -> {
+                            inputTokens.set(usage.promptTokens());
+                            outputTokens.set(usage.completionTokens());
                           });
-                  // The API stamps finish_reason on its terminal chunk; if the stream ends without
-                  // one (the SDK ends silently — no retry, maxRetries(0)), the text is partial.
-                  if (choice.finishReason().isPresent()) {
-                    completed.set(true);
-                  }
+                  chunk
+                      .choices()
+                      .forEach(
+                          choice -> {
+                            choice
+                                .delta()
+                                .content()
+                                .ifPresent(
+                                    delta -> {
+                                      firstTokenMs.compareAndSet(null, elapsedMs(start));
+                                      full.append(delta);
+                                      onToken.accept(delta);
+                                    });
+                            // The API stamps finish_reason on its terminal content chunk; if the
+                            // stream ends without one (the SDK ends silently — no retry,
+                            // maxRetries(0)), the text is partial.
+                            if (choice.finishReason().isPresent()) {
+                              completed.set(true);
+                            }
+                          });
                 });
       }
       return completed.get()
-          ? ProviderResultMapper.success(id, full.toString(), elapsedMs(start))
+          ? ProviderResultMapper.success(
+              id,
+              full.toString(),
+              elapsedMs(start),
+              new StreamTelemetry(
+                  firstTokenMs.get(), inputTokens.get(), outputTokens.get(), reportedModel.get()))
           : ProviderResultMapper.truncated(id, elapsedMs(start));
     } catch (RuntimeException ex) {
       return ProviderResultMapper.error(id, ex.getMessage(), elapsedMs(start));

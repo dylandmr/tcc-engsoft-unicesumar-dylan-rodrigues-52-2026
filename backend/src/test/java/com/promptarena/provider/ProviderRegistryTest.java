@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.promptarena.dto.PromptRequest;
 import com.promptarena.dto.ProviderResponse;
+import com.promptarena.dto.StreamTelemetry;
 import com.promptarena.model.Outcome;
 import com.promptarena.model.Provider;
 import java.util.List;
@@ -21,7 +22,7 @@ class ProviderRegistryTest {
 
       @Override
       public ProviderResponse stream(PromptRequest request, java.util.function.Consumer<String> t) {
-        return ProviderResultMapper.success(id, "ok", 1L);
+        return ProviderResultMapper.success(id, "ok", 1L, StreamTelemetry.none());
       }
     };
   }

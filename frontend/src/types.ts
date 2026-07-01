@@ -11,6 +11,14 @@ export interface ProviderResult {
   responseText: string | null
   errorMessage: string | null
   responseTimeMs: number | null
+  /** Time-to-first-token in ms, same clock as responseTimeMs (FR-019). */
+  firstTokenMs: number | null
+  /** Provider-reported prompt token count (FR-019). */
+  inputTokens: number | null
+  /** Provider-reported completion token count (FR-019). */
+  outputTokens: number | null
+  /** Exact model id the provider reports as having answered (FR-019). */
+  model: string | null
 }
 
 /** Payload of an SSE `chunk` event — an incremental text delta for one provider. */

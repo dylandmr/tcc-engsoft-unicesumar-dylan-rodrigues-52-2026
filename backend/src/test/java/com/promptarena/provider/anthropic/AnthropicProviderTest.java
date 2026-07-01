@@ -53,7 +53,9 @@ class AnthropicProviderTest {
 
   /**
    * A streaming (SSE) Messages response delivering the given text deltas within the canonical
-   * message_start → content_block_delta* → message_stop event sequence.
+   * message_start → content_block_delta* → message_stop event sequence. Mirroring the live API,
+   * message_start reports the exact model + input usage, and the closing message_delta reports the
+   * CUMULATIVE output token count.
    */
   private void stubMessagesStream(String... deltas) {
     StringBuilder body = openingEvents(deltas);
@@ -62,7 +64,7 @@ class AnthropicProviderTest {
         .append("event: message_delta\n")
         .append(
             "data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\","
-                + "\"stop_sequence\":null},\"usage\":{\"output_tokens\":1}}\n\n")
+                + "\"stop_sequence\":null},\"usage\":{\"output_tokens\":27}}\n\n")
         .append("event: message_stop\n")
         .append("data: {\"type\":\"message_stop\"}\n\n");
     stubStream(body);
@@ -81,8 +83,9 @@ class AnthropicProviderTest {
     body.append("event: message_start\n")
         .append(
             "data: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_1\",\"type\":\"message\","
-                + "\"role\":\"assistant\",\"content\":[],\"model\":\"claude-test\",\"stop_reason\":null,"
-                + "\"stop_sequence\":null,\"usage\":{\"input_tokens\":1,\"output_tokens\":1}}}\n\n")
+                + "\"role\":\"assistant\",\"content\":[],\"model\":\"claude-test-20250101\","
+                + "\"stop_reason\":null,\"stop_sequence\":null,"
+                + "\"usage\":{\"input_tokens\":9,\"output_tokens\":1}}}\n\n")
         .append("event: content_block_start\n")
         .append(
             "data: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\","
@@ -132,6 +135,20 @@ class AnthropicProviderTest {
   }
 
   @Test
+  void streamedSuccessHarvestsUsageModelAndTimeToFirstToken() {
+    stubMessagesStream("Hello ", "world");
+
+    ProviderResponse response = provider("test-key").stream(new PromptRequest("hi"), token -> {});
+
+    // TTFT was stamped on the first delta, on the same clock as the total latency.
+    assertThat(response.firstTokenMs()).isNotNull().isBetween(0L, response.responseTimeMs());
+    // input usage + exact model ride message_start; the last (cumulative) message_delta wins.
+    assertThat(response.inputTokens()).isEqualTo(9L);
+    assertThat(response.outputTokens()).isEqualTo(27L);
+    assertThat(response.model()).isEqualTo("claude-test-20250101");
+  }
+
+  @Test
   void streamThatEndsWithoutMessageStopIsMappedToError() {
     // A mid-answer drop: deltas stream in, but the terminal message_stop event never arrives.
     stubIncompleteMessagesStream("The answer starts", " and is then cut");
@@ -140,10 +157,14 @@ class AnthropicProviderTest {
     ProviderResponse response = provider("test-key").stream(new PromptRequest("hi"), tokens::add);
 
     // The partial deltas still stream to the caller, but the result is a truncation error — never a
-    // partial answer dressed up as a complete SUCCESS.
+    // partial answer dressed up as a complete SUCCESS. A truncated stream carries no telemetry,
+    // even though message_start had already reported usage and model.
     assertThat(tokens).containsExactly("The answer starts", " and is then cut");
     assertThat(response.outcome()).isEqualTo(Outcome.ERROR);
     assertThat(response.errorMessage()).contains("interrompida");
+    assertThat(response.firstTokenMs()).isNull();
+    assertThat(response.inputTokens()).isNull();
+    assertThat(response.model()).isNull();
   }
 
   @Test
@@ -154,6 +175,10 @@ class AnthropicProviderTest {
 
     assertThat(response.outcome()).isEqualTo(Outcome.EMPTY);
     assertThat(response.text()).isEmpty();
+    // No token ever streamed, so there is no TTFT — but the reported usage/model still count.
+    assertThat(response.firstTokenMs()).isNull();
+    assertThat(response.inputTokens()).isEqualTo(9L);
+    assertThat(response.model()).isEqualTo("claude-test-20250101");
   }
 
   @Test

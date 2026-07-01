@@ -1,13 +1,15 @@
 package com.promptarena.provider;
 
 import com.promptarena.dto.ProviderResponse;
+import com.promptarena.dto.StreamTelemetry;
 import com.promptarena.model.Outcome;
 import com.promptarena.model.Provider;
 
 /**
  * Maps a raw provider call into the uniform {@link ProviderResponse}, classifying the outcome
  * (FR-011, FR-012, FR-013). This is the single place that decides {@code SUCCESS} vs {@code EMPTY}
- * vs {@code ERROR} vs {@code TIMEOUT}, so every adapter and the orchestrator agree.
+ * vs {@code ERROR} vs {@code TIMEOUT}, so every adapter and the orchestrator agree. Only successful
+ * calls carry stream telemetry (FR-019); every failure shape records it as absent.
  */
 public final class ProviderResultMapper {
 
@@ -15,12 +17,23 @@ public final class ProviderResultMapper {
 
   /**
    * A completed call. A blank/null body is a successful-but-empty response ({@code EMPTY}),
-   * distinguished from an error (FR-013); otherwise {@code SUCCESS}.
+   * distinguished from an error (FR-013); otherwise {@code SUCCESS}. {@code telemetry} carries
+   * whatever the adapter harvested from the stream (never null — use {@link StreamTelemetry#none()}
+   * when nothing was captured); its fields are already nullable per value.
    */
-  public static ProviderResponse success(Provider provider, String text, Long responseTimeMs) {
+  public static ProviderResponse success(
+      Provider provider, String text, Long responseTimeMs, StreamTelemetry telemetry) {
     boolean empty = text == null || text.isBlank();
     return new ProviderResponse(
-        provider, empty ? Outcome.EMPTY : Outcome.SUCCESS, empty ? "" : text, null, responseTimeMs);
+        provider,
+        empty ? Outcome.EMPTY : Outcome.SUCCESS,
+        empty ? "" : text,
+        null,
+        responseTimeMs,
+        telemetry.firstTokenMs(),
+        telemetry.inputTokens(),
+        telemetry.outputTokens(),
+        telemetry.model());
   }
 
   /**
@@ -34,13 +47,25 @@ public final class ProviderResultMapper {
         Outcome.ERROR,
         null,
         message == null ? "Erro no provedor." : message,
-        responseTimeMs);
+        responseTimeMs,
+        null,
+        null,
+        null,
+        null);
   }
 
   /** A call that exceeded the per-provider response-time limit (FR-012). */
   public static ProviderResponse timeout(Provider provider) {
     return new ProviderResponse(
-        provider, Outcome.TIMEOUT, null, "Sem resposta dentro do tempo limite.", null);
+        provider,
+        Outcome.TIMEOUT,
+        null,
+        "Sem resposta dentro do tempo limite.",
+        null,
+        null,
+        null,
+        null,
+        null);
   }
 
   /**
@@ -55,6 +80,10 @@ public final class ProviderResultMapper {
         Outcome.ERROR,
         null,
         "A resposta foi interrompida antes de ser concluída. Tente novamente.",
-        responseTimeMs);
+        responseTimeMs,
+        null,
+        null,
+        null,
+        null);
   }
 }
