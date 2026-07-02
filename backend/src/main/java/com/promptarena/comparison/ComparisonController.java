@@ -2,6 +2,9 @@ package com.promptarena.comparison;
 
 import com.promptarena.auth.CurrentUserService;
 import com.promptarena.catalog.ModelCatalogService;
+import com.promptarena.dto.AnalysisChunkEvent;
+import com.promptarena.dto.AnalysisEvent;
+import com.promptarena.dto.AnalysisSummary;
 import com.promptarena.dto.ChunkEvent;
 import com.promptarena.dto.ComparisonDetailResponse;
 import com.promptarena.dto.ComparisonListResponse;
@@ -36,6 +39,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -53,6 +57,7 @@ public class ComparisonController {
   private static final long STREAM_TIMEOUT_MS = 120_000L;
 
   private final ComparisonService comparisonService;
+  private final AnalysisService analysisService;
   private final CurrentUserService currentUser;
   private final ComparisonRepository comparisons;
   private final ModelCatalogService modelCatalog;
@@ -61,12 +66,14 @@ public class ComparisonController {
 
   public ComparisonController(
       ComparisonService comparisonService,
+      AnalysisService analysisService,
       CurrentUserService currentUser,
       ComparisonRepository comparisons,
       ModelCatalogService modelCatalog,
       @Qualifier("providerExecutor") Executor streamExecutor,
       @Value("${prompt-arena.max-prompt-len:8000}") int maxPromptLen) {
     this.comparisonService = comparisonService;
+    this.analysisService = analysisService;
     this.currentUser = currentUser;
     this.comparisons = comparisons;
     this.modelCatalog = modelCatalog;
@@ -129,7 +136,12 @@ public class ComparisonController {
     Map<Provider, String> models = new EnumMap<>(Provider.class);
     models.putAll(comparison.getModels());
     return new ComparisonDetailResponse(
-        comparison.getId(), comparison.getPrompt(), comparison.getCreatedAt(), models, results);
+        comparison.getId(),
+        comparison.getPrompt(),
+        comparison.getCreatedAt(),
+        models,
+        results,
+        toAnalysisSummary(comparison));
   }
 
   /**
@@ -148,15 +160,59 @@ public class ComparisonController {
   /** Drive one stream to completion, isolating any failure into {@code completeWithError}. */
   void runStream(Comparison comparison, SseEmitter emitter) {
     try {
-      int completed =
-          comparison.getStatus() == Status.PENDING
-              ? comparisonService.execute(
-                  comparison.getId(),
-                  (provider, delta) -> sendChunk(emitter, provider, delta),
-                  event -> send(emitter, event))
-              : comparisonService.replay(comparison.getId(), event -> send(emitter, event));
+      int completed;
+      if (comparison.getStatus() == Status.PENDING) {
+        completed =
+            comparisonService.execute(
+                comparison.getId(),
+                (provider, delta) -> sendChunk(emitter, provider, delta),
+                event -> send(emitter, event));
+      } else {
+        completed = comparisonService.replay(comparison.getId(), event -> send(emitter, event));
+        // A replayed comparison that has a recorded analysis also emits it (FR-021) — additive,
+        // terminal shape only (no chunks), before "done".
+        if (comparison.hasAnalysis()) {
+          emitter.send(
+              SseEmitter.event().name("analysis").data(AnalysisService.recordedEvent(comparison)));
+        }
+      }
       emitter.send(
           SseEmitter.event().name("done").data(new DoneEvent(comparison.getId(), completed)));
+      emitter.complete();
+    } catch (Exception ex) {
+      emitter.completeWithError(ex);
+    }
+  }
+
+  /**
+   * Open the comparative-analysis stream (FR-021): generate the key-differences analysis with the
+   * caller-picked judge, or replay the recorded one (judge parameters then ignored). Ownership and
+   * validation (judge parameters, comparison completeness, at least two successful answers) are
+   * checked here on the request thread, so failures surface as HTTP 404/400 before any SSE.
+   */
+  @GetMapping(value = "/{id}/analysis/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+  public SseEmitter analysisStream(
+      @PathVariable String id,
+      @RequestParam(required = false) String provider,
+      @RequestParam(required = false) String model) {
+    Comparison comparison = loadOwned(id);
+    JudgeSelection judge = analysisService.prepare(comparison.getId(), provider, model);
+    SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT_MS);
+    streamExecutor.execute(() -> runAnalysisStream(comparison.getId(), judge, emitter));
+    return emitter;
+  }
+
+  /**
+   * Drive one analysis stream to completion: judge deltas as {@code analysis-chunk} events
+   * (generation only), then the terminal {@code analysis} event — persisted first when the judge
+   * succeeded — then {@code done}. Any failure is isolated into {@code completeWithError}.
+   */
+  void runAnalysisStream(String comparisonId, JudgeSelection judge, SseEmitter emitter) {
+    try {
+      AnalysisEvent analysis =
+          analysisService.run(comparisonId, judge, delta -> sendAnalysisChunk(emitter, delta));
+      emitter.send(SseEmitter.event().name("analysis").data(analysis));
+      emitter.send(SseEmitter.event().name("done").data(new DoneEvent(comparisonId, 1)));
       emitter.complete();
     } catch (Exception ex) {
       emitter.completeWithError(ex);
@@ -178,6 +234,27 @@ public class ComparisonController {
     } catch (IOException ex) {
       throw new UncheckedIOException(ex);
     }
+  }
+
+  /** Emit one judge text delta as an {@code analysis-chunk} SSE event (FR-021). */
+  private static void sendAnalysisChunk(SseEmitter emitter, String delta) {
+    try {
+      emitter.send(SseEmitter.event().name("analysis-chunk").data(new AnalysisChunkEvent(delta)));
+    } catch (IOException ex) {
+      throw new UncheckedIOException(ex);
+    }
+  }
+
+  /** The recorded analysis for the detail response, or {@code null} when none exists (FR-021). */
+  private static AnalysisSummary toAnalysisSummary(Comparison comparison) {
+    if (!comparison.hasAnalysis()) {
+      return null;
+    }
+    return new AnalysisSummary(
+        comparison.getAnalysisText(),
+        comparison.getAnalysisProvider(),
+        comparison.getAnalysisModel(),
+        AnalysisService.labels(comparison.getAnalysisOrder()));
   }
 
   private Comparison loadOwned(String id) {

@@ -14,6 +14,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MapKeyColumn;
 import jakarta.persistence.MapKeyEnumerated;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -69,6 +70,36 @@ public class Comparison {
   @OneToMany(mappedBy = "comparison", cascade = CascadeType.ALL, orphanRemoval = true)
   private List<ProviderResult> results = new ArrayList<>();
 
+  /**
+   * The recorded comparative analysis (FR-021), generated on demand by a user-picked judge after
+   * completion. Null until {@link #recordAnalysis} runs; once recorded it is immutable and replayed
+   * instead of regenerated. A judge failure records nothing.
+   */
+  @Column(name = "analysis_text", columnDefinition = "text")
+  private String analysisText;
+
+  /** The judge provider that produced the recorded analysis (FR-021). Null until recorded. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "analysis_provider")
+  private Provider analysisProvider;
+
+  /** The judge model that produced the recorded analysis (FR-021). Null until recorded. */
+  @Column(name = "analysis_model")
+  private String analysisModel;
+
+  /**
+   * The randomized provider order the judge saw, backing the anonymous "Modelo A/B/…" labels
+   * (FR-021): index 0 is label "A", index 1 is "B", and so on. Empty until an analysis is recorded.
+   */
+  @ElementCollection(fetch = FetchType.EAGER)
+  @CollectionTable(
+      name = "comparison_analysis_order",
+      joinColumns = @JoinColumn(name = "comparison_id"))
+  @OrderColumn(name = "position")
+  @Enumerated(EnumType.STRING)
+  @Column(name = "provider", nullable = false)
+  private List<Provider> analysisOrder = new ArrayList<>();
+
   protected Comparison() {
     // for JPA
   }
@@ -97,6 +128,23 @@ public class Comparison {
 
   public void markComplete() {
     this.status = Status.COMPLETE;
+  }
+
+  /**
+   * Record the generated comparative analysis (FR-021): the judge's markdown, the judge identity,
+   * and the randomized provider order behind the anonymous labels (index 0 = "A").
+   */
+  public void recordAnalysis(String text, Provider provider, String model, List<Provider> order) {
+    this.analysisText = text;
+    this.analysisProvider = provider;
+    this.analysisModel = model;
+    this.analysisOrder.clear();
+    this.analysisOrder.addAll(order);
+  }
+
+  /** Whether a comparative analysis has been recorded (it is then replayed, never regenerated). */
+  public boolean hasAnalysis() {
+    return analysisText != null;
   }
 
   public String getId() {
@@ -129,5 +177,21 @@ public class Comparison {
 
   public List<ProviderResult> getResults() {
     return results;
+  }
+
+  public String getAnalysisText() {
+    return analysisText;
+  }
+
+  public Provider getAnalysisProvider() {
+    return analysisProvider;
+  }
+
+  public String getAnalysisModel() {
+    return analysisModel;
+  }
+
+  public List<Provider> getAnalysisOrder() {
+    return analysisOrder;
   }
 }

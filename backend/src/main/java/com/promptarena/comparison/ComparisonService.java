@@ -150,7 +150,12 @@ public class ComparisonService {
         .whenComplete((response, ignored) -> onResult.accept(response));
   }
 
-  private static ProviderResponse classifyFailure(Provider provider, Throwable ex) {
+  /**
+   * Classify a dispatch failure into the provider's own uniform response: a {@link
+   * TimeoutException} is a TIMEOUT, anything else an ERROR. Shared with the judge call of {@link
+   * AnalysisService} so both fan-outs fail identically.
+   */
+  static ProviderResponse classifyFailure(Provider provider, Throwable ex) {
     Throwable cause = unwrap(ex);
     if (cause instanceof TimeoutException) {
       return ProviderResultMapper.timeout(provider);
