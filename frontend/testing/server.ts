@@ -85,6 +85,7 @@ export const handlers = [
     ]),
   ),
   http.get('/api/comparisons', () => HttpResponse.json({ comparisons: [] })),
+  http.get('/api/comparisons/stats', () => HttpResponse.json({ stats: [] })),
 ]
 
 export const server = setupServer(...handlers)

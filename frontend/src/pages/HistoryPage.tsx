@@ -1,12 +1,17 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import type { ComparisonSummary } from '../types'
+import type { ComparisonSummary, ProviderStats } from '../types'
 import { useHistory } from '../hooks/useHistory'
 import { useSession } from '../auth/SessionContext'
 import { TopBar } from '../components/ui/TopBar'
 import { Panel } from '../components/ui/Panel'
 import { PROVIDER_STYLES } from '../lib/providerStyles'
-import { relativeTime } from '../lib/format'
+import { providerMeta } from '../lib/providers'
+import {
+  formatLatency,
+  formatTokensPerSecond,
+  relativeTime,
+} from '../lib/format'
 import { cn } from '../lib/cn'
 
 const DELETE_FAILED = 'Não foi possível apagar. Tente novamente.'
@@ -93,9 +98,93 @@ function HistoryRow({
   )
 }
 
+/** "N corrida(s)" / "N vazia(s)" / "N erro(s)" / "N timeout(s)". */
+function count(n: number, singular: string, plural: string): string {
+  return `${n} ${n === 1 ? singular : plural}`
+}
+
+/** Outcome breakdown, e.g. "7 ok · 1 erro" — zero non-success categories hidden. */
+function outcomeLine(stats: ProviderStats): string {
+  const parts = [`${stats.successes} ok`]
+  if (stats.empties > 0) parts.push(count(stats.empties, 'vazia', 'vazias'))
+  if (stats.errors > 0) parts.push(count(stats.errors, 'erro', 'erros'))
+  if (stats.timeouts > 0)
+    parts.push(count(stats.timeouts, 'timeout', 'timeouts'))
+  return parts.join(' · ')
+}
+
+/** One metric of a stats card: mono label over the averaged readout (or "—"). */
+function StatMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-[10px] uppercase tracking-[0.18em] text-mist">
+        {label}
+      </dt>
+      <dd className="mt-0.5 text-bright">{value}</dd>
+    </div>
+  )
+}
+
+/** One provider's aggregate card in the "ESTATÍSTICAS" strip (FR-023). */
+function StatsCard({ stats }: { stats: ProviderStats }) {
+  const meta = providerMeta(stats.provider)
+  return (
+    <Panel
+      role="group"
+      aria-label={`estatísticas de ${meta.label}`}
+      className="px-4 py-3"
+    >
+      <div className="flex items-baseline gap-2">
+        <span
+          className={cn(
+            'size-2 self-center rounded-full',
+            PROVIDER_STYLES[stats.provider].dot,
+          )}
+        />
+        <span className="font-display text-sm font-bold text-bright">
+          {meta.label}
+        </span>
+        <span className="ml-auto shrink-0 font-mono text-xs text-mist">
+          {count(stats.runs, 'corrida', 'corridas')}
+        </span>
+      </div>
+      <p className="mt-1 font-mono text-xs text-mist">{outcomeLine(stats)}</p>
+      <dl className="mt-3 grid grid-cols-3 gap-2 font-mono text-xs">
+        <StatMetric
+          label="latência"
+          value={
+            stats.avgResponseTimeMs !== null
+              ? formatLatency(stats.avgResponseTimeMs)
+              : '—'
+          }
+        />
+        <StatMetric
+          label="1º token"
+          value={
+            stats.avgFirstTokenMs !== null
+              ? formatLatency(stats.avgFirstTokenMs)
+              : '—'
+          }
+        />
+        <StatMetric
+          label="tok/s"
+          value={
+            stats.avgTokensPerSecond !== null
+              ? formatTokensPerSecond(stats.avgTokensPerSecond)
+              : '—'
+          }
+        />
+      </dl>
+      <p className="mt-2 font-mono text-[10px] text-mist/80">
+        telemetria em {stats.telemetryRuns} de {stats.runs} execuções
+      </p>
+    </Panel>
+  )
+}
+
 /** Per-user history of past comparisons (US4 / FR-015, FR-017) with deletion (FR-022). */
 export function HistoryPage() {
-  const { items, failed, remove, clear } = useHistory()
+  const { items, stats, failed, remove, clear } = useHistory()
   const { signOut } = useSession()
   const navigate = useNavigate()
   const [clearConfirming, setClearConfirming] = useState(false)
@@ -167,6 +256,19 @@ export function HistoryPage() {
               </button>
             ))}
         </div>
+
+        {stats.length > 0 && (
+          <section aria-label="Estatísticas" className="mb-8">
+            <p className="font-mono text-xs tracking-[0.18em] text-ignition">
+              ESTATÍSTICAS
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {stats.map((entry) => (
+                <StatsCard key={entry.provider} stats={entry} />
+              ))}
+            </div>
+          </section>
+        )}
 
         {clearFailed && (
           <p role="alert" className="mb-4 font-mono text-xs text-error">

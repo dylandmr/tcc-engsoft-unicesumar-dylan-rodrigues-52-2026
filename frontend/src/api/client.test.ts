@@ -6,6 +6,7 @@ import {
   createComparison,
   deleteComparison,
   getProviders,
+  getStats,
   listComparisons,
   login,
   logout,
@@ -139,6 +140,55 @@ describe('api client', () => {
     const items = await listComparisons()
     expect(items).toHaveLength(1)
     expect(items[0].id).toBe('c1')
+  })
+
+  it('fetches the per-provider aggregate statistics (FR-023)', async () => {
+    server.use(
+      http.get('/api/comparisons/stats', () =>
+        HttpResponse.json({
+          stats: [
+            {
+              provider: 'GEMINI',
+              runs: 9,
+              successes: 7,
+              empties: 0,
+              errors: 1,
+              timeouts: 1,
+              telemetryRuns: 6,
+              avgResponseTimeMs: 2310,
+              avgFirstTokenMs: 820,
+              avgTokensPerSecond: 41.2,
+            },
+          ],
+        }),
+      ),
+    )
+    const stats = await getStats()
+    expect(stats).toHaveLength(1)
+    expect(stats[0]).toEqual({
+      provider: 'GEMINI',
+      runs: 9,
+      successes: 7,
+      empties: 0,
+      errors: 1,
+      timeouts: 1,
+      telemetryRuns: 6,
+      avgResponseTimeMs: 2310,
+      avgFirstTokenMs: 820,
+      avgTokensPerSecond: 41.2,
+    })
+  })
+
+  it('propagates the contract error when the statistics fetch fails', async () => {
+    server.use(
+      http.get('/api/comparisons/stats', () =>
+        HttpResponse.json({ error: 'boom' }, { status: 500 }),
+      ),
+    )
+    await expect(getStats()).rejects.toMatchObject({
+      code: 'boom',
+      status: 500,
+    })
   })
 
   it('deletes one comparison via DELETE with the CSRF header (FR-022)', async () => {

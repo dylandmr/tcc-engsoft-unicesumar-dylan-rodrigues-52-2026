@@ -4,6 +4,7 @@ import type {
   ModelSelection,
   ProviderCatalogEntry,
   ProviderId,
+  ProviderStats,
   User,
 } from '../types'
 
@@ -94,6 +95,14 @@ export async function listComparisons(): Promise<ComparisonSummary[]> {
     '/api/comparisons',
   )
   return data.comparisons
+}
+
+/** Per-provider aggregate statistics over the caller's own runs (FR-023). */
+export async function getStats(): Promise<ProviderStats[]> {
+  const data = await request<{ stats: ProviderStats[] }>(
+    '/api/comparisons/stats',
+  )
+  return data.stats
 }
 
 /** Permanently delete one owned comparison and everything recorded for it (FR-022). */

@@ -83,6 +83,25 @@ export interface ProviderCatalogEntry {
   models: string[]
 }
 
+/**
+ * One provider's aggregate over the caller's recorded runs, from
+ * GET /api/comparisons/stats (FR-023). `runs` = successes + empties +
+ * errors + timeouts; each average is null when no run carries the values
+ * it needs, and `telemetryRuns` is the honest basis the SPA captions.
+ */
+export interface ProviderStats {
+  provider: ProviderId
+  runs: number
+  successes: number
+  empties: number
+  errors: number
+  timeouts: number
+  telemetryRuns: number
+  avgResponseTimeMs: number | null
+  avgFirstTokenMs: number | null
+  avgTokensPerSecond: number | null
+}
+
 /** A summary row from GET /api/comparisons. */
 export interface ComparisonSummary {
   id: string
