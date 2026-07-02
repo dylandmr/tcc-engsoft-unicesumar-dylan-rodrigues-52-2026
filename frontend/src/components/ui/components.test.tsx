@@ -7,7 +7,7 @@ import { Backdrop } from './Backdrop'
 import { Logo } from './Logo'
 import { LoadingScreen } from './LoadingScreen'
 import { PromptInput } from './PromptInput'
-import { ProviderChip } from './ProviderChip'
+import { ContenderCard } from './ContenderCard'
 import { ProviderLane } from './ProviderLane'
 import { providerMeta } from '../../lib/providers'
 import type { LaneState } from '../../hooks/arenaReducer'
@@ -51,42 +51,73 @@ describe('PromptInput', () => {
   })
 })
 
-describe('ProviderChip', () => {
-  it('renders selected vs unselected, and toggles on click', async () => {
-    const onToggle = vi.fn()
-    const { rerender } = render(
-      <ProviderChip
-        meta={providerMeta('CLAUDE')}
-        selected={false}
-        disabled={false}
-        onToggle={onToggle}
-      />,
-    )
-    const chip = screen.getByRole('checkbox', { name: 'Claude' })
-    expect(chip).toHaveAttribute('aria-checked', 'false')
-    await userEvent.click(chip)
-    expect(onToggle).toHaveBeenCalled()
+function renderCard(over: {
+  order?: number
+  configured?: boolean
+  disabled?: boolean
+  onToggle?: () => void
+  onModelChange?: (model: string) => void
+}) {
+  return render(
+    <ContenderCard
+      meta={providerMeta('CLAUDE')}
+      order={over.order ?? -1}
+      configured={over.configured ?? true}
+      disabled={over.disabled ?? false}
+      model="claude-3-5-sonnet-latest"
+      models={['claude-3-5-haiku-latest', 'claude-3-5-sonnet-latest']}
+      defaultModel="claude-3-5-sonnet-latest"
+      onToggle={over.onToggle ?? (() => {})}
+      onModelChange={over.onModelChange ?? (() => {})}
+    />,
+  )
+}
 
-    rerender(
-      <ProviderChip
-        meta={providerMeta('CLAUDE')}
-        selected={true}
-        disabled={false}
-        onToggle={onToggle}
-      />,
-    )
-    expect(screen.getByRole('checkbox')).toHaveAttribute('aria-checked', 'true')
+describe('ContenderCard', () => {
+  it('renders an idle card with a "+" affordance and toggles on click', async () => {
+    const onToggle = vi.fn()
+    renderCard({ onToggle })
+    const card = screen.getByRole('checkbox', { name: 'Claude' })
+    expect(card).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByText('+')).toBeInTheDocument()
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+    await userEvent.click(card)
+    expect(onToggle).toHaveBeenCalled()
   })
 
-  it('is disabled when the selection limit is reached', () => {
-    render(
-      <ProviderChip
-        meta={providerMeta('GROK')}
-        selected={false}
-        disabled={true}
-        onToggle={vi.fn()}
-      />,
+  it('renders an armed card with its order badge and model combo box', () => {
+    renderCard({ order: 1 })
+    expect(screen.getByRole('checkbox', { name: 'Claude' })).toHaveAttribute(
+      'aria-checked',
+      'true',
     )
+    expect(screen.getByText('2º')).toBeInTheDocument()
+    expect(screen.queryByText('+')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('combobox', { name: 'Modelo de Claude' }),
+    ).toHaveValue('claude-3-5-sonnet-latest')
+  })
+
+  it('forwards model picks from the combo box', async () => {
+    const onModelChange = vi.fn()
+    renderCard({ order: 0, onModelChange })
+    await userEvent.click(
+      screen.getByRole('combobox', { name: 'Modelo de Claude' }),
+    )
+    await userEvent.click(screen.getByRole('option', { name: /haiku/ }))
+    expect(onModelChange).toHaveBeenCalledWith('claude-3-5-haiku-latest')
+  })
+
+  it('hints an unconfigured provider yet keeps it armable', async () => {
+    const onToggle = vi.fn()
+    renderCard({ configured: false, onToggle })
+    expect(screen.getByText('não configurado')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Claude' }))
+    expect(onToggle).toHaveBeenCalled()
+  })
+
+  it('is disabled while idle when the grid is full', () => {
+    renderCard({ disabled: true })
     expect(screen.getByRole('checkbox')).toBeDisabled()
   })
 })
@@ -205,6 +236,36 @@ describe('ProviderLane', () => {
     )
     expect(screen.getByText(/time limit/)).toBeInTheDocument()
     expect(screen.getByText('tempo esgotado')).toBeInTheDocument()
+  })
+})
+
+describe('ProviderLane model sublabel', () => {
+  it('shows the requested model until the provider reports one', () => {
+    render(
+      <ProviderLane
+        lane={lane({ status: 'live' })}
+        requestedModel="claude-3-5-sonnet-latest"
+      />,
+    )
+    expect(screen.getByText('claude-3-5-sonnet-latest')).toBeInTheDocument()
+  })
+
+  it('prefers the provider-reported model over the requested one', () => {
+    render(
+      <ProviderLane
+        lane={lane({ status: 'done', model: 'claude-3-5-sonnet-20241022' })}
+        requestedModel="claude-3-5-sonnet-latest"
+      />,
+    )
+    expect(screen.getByText('claude-3-5-sonnet-20241022')).toBeInTheDocument()
+    expect(
+      screen.queryByText('claude-3-5-sonnet-latest'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('shows no sublabel when neither is known (history replay pre-result)', () => {
+    render(<ProviderLane lane={lane({ status: 'live' })} />)
+    expect(screen.queryByText(/claude-3-5/)).not.toBeInTheDocument()
   })
 })
 

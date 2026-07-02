@@ -3,6 +3,7 @@ import { http, HttpResponse, server } from '../../testing/server'
 import {
   ApiError,
   createComparison,
+  getProviders,
   listComparisons,
   login,
   logout,
@@ -71,12 +72,42 @@ describe('api client', () => {
     await expect(logout()).resolves.toBeUndefined()
   })
 
-  it('creates a comparison', async () => {
-    const created = await createComparison('hi', ['CLAUDE', 'CHATGPT'])
+  it('creates a comparison, sending the per-provider models map (FR-020)', async () => {
+    let body: unknown = null
+    server.use(
+      http.post('/api/comparisons', async ({ request }) => {
+        body = await request.json()
+        return HttpResponse.json(
+          { comparisonId: 'c_test', providers: ['CLAUDE', 'CHATGPT'] },
+          { status: 201 },
+        )
+      }),
+    )
+    const created = await createComparison('hi', ['CLAUDE', 'CHATGPT'], {
+      CLAUDE: 'claude-3-5-haiku-latest',
+      CHATGPT: 'gpt-4o-mini',
+    })
     expect(created).toEqual({
       comparisonId: 'c_test',
       providers: ['CLAUDE', 'CHATGPT'],
     })
+    expect(body).toEqual({
+      prompt: 'hi',
+      providers: ['CLAUDE', 'CHATGPT'],
+      models: { CLAUDE: 'claude-3-5-haiku-latest', CHATGPT: 'gpt-4o-mini' },
+    })
+  })
+
+  it('fetches the provider catalog (FR-020)', async () => {
+    const catalog = await getProviders()
+    expect(catalog).toHaveLength(5)
+    expect(catalog[0]).toMatchObject({
+      provider: 'GEMINI',
+      configured: true,
+      defaultModel: 'gemini-2.5-flash',
+      source: 'live',
+    })
+    expect(catalog[0].models).toContain('gemini-2.5-flash')
   })
 
   it('lists comparisons', async () => {

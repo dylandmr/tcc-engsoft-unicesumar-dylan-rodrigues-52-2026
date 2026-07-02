@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
-import type { ProviderId } from '../types'
+import type { ModelSelection, ProviderId } from '../types'
 import { useArena } from '../hooks/useArena'
 import { buildRaceSummary } from '../lib/raceSummary'
 import { ProviderLane } from './ui/ProviderLane'
@@ -12,10 +12,12 @@ interface ArenaProps {
   comparisonId: string
   providers: ProviderId[]
   prompt: string
+  /** Requested model per provider (nav state, FR-020); absent on history replay. */
+  models?: ModelSelection
 }
 
 /** The live results arena: one race-lane per provider, filling independently. */
-export function Arena({ comparisonId, providers, prompt }: ArenaProps) {
+export function Arena({ comparisonId, providers, prompt, models }: ArenaProps) {
   const state = useArena(comparisonId, providers)
   // The winner badge and the post-race drawer are both derived from persisted
   // responseTimeMs — SSE arrival order lies on history replay (results are
@@ -53,6 +55,7 @@ export function Arena({ comparisonId, providers, prompt }: ArenaProps) {
             key={id}
             lane={{ ...state.lanes[id], first: id === summary.winner }}
             index={index}
+            requestedModel={models?.[id]}
           />
         ))}
       </div>

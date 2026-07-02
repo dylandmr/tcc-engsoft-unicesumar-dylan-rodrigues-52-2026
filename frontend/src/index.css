@@ -120,6 +120,16 @@ body {
   }
 }
 
+/* Launch sequence — the ignition progress line fills while the overlay holds. */
+@keyframes launch-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
 /* Page entrance — static fade/rise for full-page mounts (lanes keep their own stagger). */
 @keyframes page-in {
   from {

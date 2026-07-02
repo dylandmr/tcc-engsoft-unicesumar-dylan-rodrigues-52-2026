@@ -39,6 +39,22 @@ export interface CreatedComparison {
   providers: ProviderId[]
 }
 
+/** Requested model per selected provider (POST /api/comparisons, FR-020). */
+export type ModelSelection = Partial<Record<ProviderId, string>>
+
+/** One provider's entry in GET /api/providers (FR-020). */
+export interface ProviderCatalogEntry {
+  provider: ProviderId
+  /** Whether the server holds an API key for this provider. */
+  configured: boolean
+  /** Model used when the user picks none. Always present in `models`. */
+  defaultModel: string
+  /** Selectable models — curated list ∪ the provider's live list. */
+  models: string[]
+  /** `live` when the provider's list API contributed entries. */
+  source: 'live' | 'curated'
+}
+
 /** A summary row from GET /api/comparisons. */
 export interface ComparisonSummary {
   id: string

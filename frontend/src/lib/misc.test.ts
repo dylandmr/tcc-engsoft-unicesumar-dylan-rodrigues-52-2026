@@ -1,8 +1,14 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cn } from './cn'
-import { providerMeta, PROVIDERS } from './providers'
+import {
+  DEFAULT_MODELS,
+  fallbackCatalog,
+  providerMeta,
+  PROVIDERS,
+} from './providers'
 import { PROVIDER_STYLES } from './providerStyles'
 import { laneStatusInfo } from './laneStatus'
+import { prefersReducedMotion } from './motion'
 import type { LaneState } from '../hooks/arenaReducer'
 
 describe('cn', () => {
@@ -19,6 +25,37 @@ describe('providers', () => {
     for (const p of PROVIDERS) {
       expect(PROVIDER_STYLES[p.id].dot).toContain(p.hue)
     }
+  })
+})
+
+describe('fallbackCatalog', () => {
+  it('builds a curated, default-only, assumed-configured entry per provider', () => {
+    const catalog = fallbackCatalog()
+    for (const p of PROVIDERS) {
+      expect(catalog[p.id]).toEqual({
+        provider: p.id,
+        configured: true,
+        defaultModel: DEFAULT_MODELS[p.id],
+        models: [DEFAULT_MODELS[p.id]],
+        source: 'curated',
+      })
+    }
+  })
+})
+
+describe('prefersReducedMotion', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('reflects the reduce media query', () => {
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true }))
+    expect(prefersReducedMotion()).toBe(true)
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: false }))
+    expect(prefersReducedMotion()).toBe(false)
+  })
+
+  it('treats a missing matchMedia as no preference', () => {
+    vi.stubGlobal('matchMedia', undefined)
+    expect(prefersReducedMotion()).toBe(false)
   })
 })
 

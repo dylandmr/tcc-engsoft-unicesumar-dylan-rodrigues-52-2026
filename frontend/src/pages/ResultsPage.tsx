@@ -1,10 +1,12 @@
 import { Navigate, useLocation, useParams } from 'react-router-dom'
-import type { ProviderId } from '../types'
+import type { ModelSelection, ProviderId } from '../types'
 import { Arena } from '../components/Arena'
 
 interface ResultsNavState {
   providers?: ProviderId[]
   prompt?: string
+  /** Requested model per provider (FR-020); absent on history replay. */
+  models?: ModelSelection
 }
 
 /**
@@ -21,6 +23,7 @@ export function ResultsPage() {
       comparisonId={id!}
       providers={nav.providers}
       prompt={nav.prompt ?? ''}
+      models={nav.models}
     />
   )
 }

@@ -15,9 +15,12 @@ const COPIED_MS = 1500
 export function ProviderLane({
   lane,
   index = 0,
+  requestedModel,
 }: {
   lane: LaneState
   index?: number
+  /** Model requested at composition (nav state) — shown until the provider reports one. */
+  requestedModel?: string
 }) {
   const meta = providerMeta(lane.provider)
   const style = PROVIDER_STYLES[lane.provider]
@@ -27,6 +30,9 @@ export function ProviderLane({
   const isFault = lane.status === 'error' || lane.status === 'timeout'
   const latency = formatLatency(lane.responseTimeMs ?? lane.elapsedMs)
   const latencyTone = isLive || lane.first ? 'text-ignition' : 'text-mist'
+  // The provider-reported model (FR-019) wins over the requested one (FR-020);
+  // history replay carries no nav state, so it shows the reported model only.
+  const model = lane.model ?? requestedModel
 
   // Auto-follow the stream: while live, keep the lane pinned to the newest
   // tokens; once the lane settles, hand scroll control back to the reader.
@@ -71,15 +77,22 @@ export function ProviderLane({
           !isDisabled && !isLive && 'animate-[settle_0.5s_ease-out]',
         )}
       />
-      <header className="flex items-baseline justify-between px-5 pt-5">
-        <h2
-          className={cn(
-            'font-display text-xl font-bold',
-            isDisabled ? 'text-mist' : 'text-bright',
+      <header className="flex items-baseline justify-between gap-3 px-5 pt-5">
+        <div className="min-w-0">
+          <h2
+            className={cn(
+              'font-display text-xl font-bold',
+              isDisabled ? 'text-mist' : 'text-bright',
+            )}
+          >
+            {meta.label}
+          </h2>
+          {model && (
+            <p className="truncate font-mono text-[11px] text-mist/80">
+              {model}
+            </p>
           )}
-        >
-          {meta.label}
-        </h2>
+        </div>
         {!isDisabled && (
           <span className={cn('font-mono text-sm', latencyTone)}>
             {latency}

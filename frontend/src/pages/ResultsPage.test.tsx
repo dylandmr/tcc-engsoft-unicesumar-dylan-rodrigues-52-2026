@@ -39,6 +39,58 @@ describe('ResultsPage', () => {
     expect(within(drawer).getByText('1.84s')).toBeInTheDocument()
   })
 
+  it('shows the requested model from navigation state while nothing is reported', async () => {
+    renderResults({
+      providers: ['CLAUDE'],
+      models: { CLAUDE: 'claude-3-5-sonnet-latest' },
+    })
+    const claude = screen.getByRole('region', { name: 'Claude' })
+    expect(
+      within(claude).getByText('claude-3-5-sonnet-latest'),
+    ).toBeInTheDocument()
+    // The default stream result reports no model — the requested one stays.
+    await waitFor(() =>
+      expect(screen.getByText('concluído · 1 modelos')).toBeInTheDocument(),
+    )
+    expect(
+      within(claude).getByText('claude-3-5-sonnet-latest'),
+    ).toBeInTheDocument()
+  })
+
+  it('lets the provider-reported model win over the requested one', async () => {
+    server.use(
+      http.get('/api/comparisons/:id/stream', () =>
+        sseResponse([
+          {
+            event: 'result',
+            data: {
+              provider: 'CLAUDE',
+              outcome: 'SUCCESS',
+              responseText: 'oi',
+              errorMessage: null,
+              responseTimeMs: 900,
+              model: 'claude-3-5-sonnet-20241022',
+            },
+          },
+          { event: 'done', data: { comparisonId: 'c1', completed: 1 } },
+        ]),
+      ),
+    )
+    renderResults({
+      providers: ['CLAUDE'],
+      models: { CLAUDE: 'claude-3-5-sonnet-latest' },
+    })
+    const claude = screen.getByRole('region', { name: 'Claude' })
+    await waitFor(() =>
+      expect(
+        within(claude).getByText('claude-3-5-sonnet-20241022'),
+      ).toBeInTheDocument(),
+    )
+    expect(
+      within(claude).queryByText('claude-3-5-sonnet-latest'),
+    ).not.toBeInTheDocument()
+  })
+
   it('pins the winner badge to the fastest responseTimeMs even when results arrive out of order (history replay)', async () => {
     // History replay re-emits persisted results in selection order — the
     // slower GEMINI arrives first here, but CLAUDE ran faster and must win.

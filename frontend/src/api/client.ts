@@ -1,6 +1,8 @@
 import type {
   ComparisonSummary,
   CreatedComparison,
+  ModelSelection,
+  ProviderCatalogEntry,
   ProviderId,
   User,
 } from '../types'
@@ -67,13 +69,22 @@ export function logout(): Promise<void> {
   return request<void>('/api/auth/logout', { method: 'POST', csrf: true })
 }
 
+/** Provider catalog for the composer: configured flag, default + models (FR-020). */
+export async function getProviders(): Promise<ProviderCatalogEntry[]> {
+  const data = await request<{ providers: ProviderCatalogEntry[] }>(
+    '/api/providers',
+  )
+  return data.providers
+}
+
 export function createComparison(
   prompt: string,
   providers: ProviderId[],
+  models: ModelSelection,
 ): Promise<CreatedComparison> {
   return request<CreatedComparison>('/api/comparisons', {
     method: 'POST',
-    body: { prompt, providers },
+    body: { prompt, providers, models },
     csrf: true,
   })
 }
