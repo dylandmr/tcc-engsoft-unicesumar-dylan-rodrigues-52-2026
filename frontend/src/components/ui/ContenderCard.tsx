@@ -42,7 +42,10 @@ export function ContenderCard({
   return (
     <div
       className={cn(
-        'relative flex min-h-[150px] flex-col rounded-[var(--radius-panel)] border bg-deck transition duration-150',
+        // The toggle button suppresses the global focus outline (an unrounded
+        // box that slices the card); the card re-exposes it here, following
+        // its own radius, only for the toggle — not the model combo box.
+        'relative flex min-h-[150px] flex-col rounded-[var(--radius-panel)] border bg-deck transition duration-150 has-[button:focus-visible]:outline-2 has-[button:focus-visible]:outline-offset-2 has-[button:focus-visible]:outline-ignition',
         armed
           ? cn(style.border, style.cardGlow)
           : 'border-line hover:border-mist/60',
@@ -73,7 +76,7 @@ export function ContenderCard({
         disabled={disabled}
         onClick={onToggle}
         className={cn(
-          'relative flex flex-1 flex-col items-start gap-1 px-4 pt-3 pb-3 text-left',
+          'relative flex flex-1 flex-col items-start gap-1 px-4 pt-3 pb-3 text-left focus-visible:outline-none',
           disabled && 'cursor-not-allowed opacity-40',
         )}
       >
