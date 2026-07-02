@@ -76,6 +76,9 @@ recorded model yields its own `ERROR` result (nothing valid to request) without 
 - Only **completed** comparisons are guaranteed to be persisted (spec Assumptions: in-flight on
   logout not guaranteed).
 - A `Comparison` is only ever readable by its owning `user_id` (FR-016).
+- A `Comparison` is only ever deletable by its owning `user_id` (FR-022); deletion cascades to its
+  `ProviderResult` children and its element collections (`comparison_providers`,
+  `comparison_models`, `comparison_analysis_order`) — nothing orphaned remains.
 - `status` starts `PENDING` on `POST`; opening the SSE stream runs the fan-out and, on completion,
   persists results and sets `status = COMPLETE`. A re-opened stream for a `COMPLETE` comparison
   replays persisted results (no provider re-call).
@@ -161,3 +164,4 @@ COMPLETE  — fan-out finished and ProviderResults persisted
 | Per-provider telemetry (TTFT, token usage, model) captured when reported | FR-019 |
 | Model per provider explicitly chosen on POST, validated against the provider-reported set, persisted | FR-020 |
 | Analysis generated on demand by a user-picked judge, anonymized/shuffled, no winner, persisted once, judge failure taints nothing | FR-021 |
+| Own-data-only deletion (single or all), cascading to results and element collections | FR-022, FR-016 |

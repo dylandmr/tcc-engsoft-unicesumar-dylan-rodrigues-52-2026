@@ -127,6 +127,10 @@ never appear.
 4. **Given** a completed comparison in which some providers failed, **When** it is saved to history,
    **Then** the recorded entry reflects both the successful responses and the failed providers'
    outcomes.
+5. **Given** a user with recorded comparisons, **When** they delete a single entry or clear the
+   whole history (each behind an explicit confirmation), **Then** the removed comparisons are
+   permanently gone — responses, telemetry, chosen models and analysis included — only their own
+   data is affected, and the empty state appears when nothing remains.
 
 ---
 
@@ -219,6 +223,11 @@ never appear.
   the label→provider mapping MUST be recorded with the comparison and shown again on replay
   without re-invoking the judge. A judge failure MUST NOT alter or taint the stored comparison
   results, and with fewer than two successful answers the analysis MUST simply be unavailable.
+- **FR-022**: System MUST let a signed-in user permanently delete a single comparison from their
+  history and clear their entire history. Deletion is scoped to the user's own data (FR-016; another
+  user's comparison is never affected and never revealed), removes everything recorded for the
+  deleted comparison(s) — provider results, telemetry, chosen models, and any recorded analysis —
+  is irreversible, and MUST require an explicit confirmation in the UI before executing.
 
 ### Key Entities *(include if feature involves data)*
 

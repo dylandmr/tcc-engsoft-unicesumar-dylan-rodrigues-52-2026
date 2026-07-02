@@ -104,6 +104,9 @@ Each scenario maps to user stories and success criteria in [spec.md](./spec.md).
    (FR-014).
 3. Sign in as a **second** user with no history → **empty state** shown (FR-017). The second user
    never sees the first user's comparisons; 0% cross-user leakage (SC-005, FR-016).
+4. **Deletion (FR-022)**: delete one history entry (confirmation required) → it disappears with all
+   its recorded data; clear the whole history (confirmation required) → the empty state appears.
+   Another user's history is unaffected either way.
 
 ## Automated test validation (Constitution III)
 

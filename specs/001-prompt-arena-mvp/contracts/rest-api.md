@@ -15,7 +15,7 @@ Base path: `/api`
 - Validation failures return **400 Bad Request** with a machine-readable `error` code.
 - Timestamps are ISO-8601 UTC.
 - **Session & CSRF**: auth is a session cookie. State-changing requests (`POST /auth/login`,
-  `POST /auth/logout`, `POST /comparisons`) require a **CSRF token**: the SPA reads it from a
+  `POST /auth/logout`, `POST /comparisons`, `DELETE /comparisons[/{id}]`) require a **CSRF token**: the SPA reads it from a
   bootstrap cookie/endpoint and echoes it in the `X-XSRF-TOKEN` header. The SSE endpoint is a
   **GET** (non-state-changing), so it is exempt from CSRF and authenticates via the session cookie
   alone — this is required because the browser `EventSource` API cannot set custom headers.
@@ -261,6 +261,25 @@ List the caller's past comparisons, newest first (FR-015, FR-017). Requires auth
   ```
   Empty history returns `{ "comparisons": [] }` (FR-017) — the SPA renders an empty state.
 
+### DELETE /api/comparisons/{id}
+
+Permanently delete one comparison the caller owns, with everything recorded for it — provider
+results, telemetry, chosen models, analysis (FR-022). State-changing: requires auth **and** the
+CSRF header.
+
+- **204 No Content** — deleted.
+- **401 Unauthorized**
+- **404 Not Found** — unknown or not owned by caller (do not reveal existence, FR-016).
+
+### DELETE /api/comparisons
+
+Permanently clear the caller's entire history (every comparison they own, FR-022). Another user's
+data is never affected. State-changing: requires auth **and** the CSRF header. Idempotent — an
+empty history clears to **204** as well.
+
+- **204 No Content** — history cleared.
+- **401 Unauthorized**
+
 ### GET /api/comparisons/{id}
 
 Full detail of one past comparison the caller owns, including each provider's recorded result
@@ -314,6 +333,8 @@ Full detail of one past comparison the caller owns, including each provider's re
 | GET /api/providers | FR-020 |
 | POST /api/comparisons | FR-004, FR-005, FR-006, FR-007, FR-020 |
 | GET /api/comparisons/{id}/analysis/stream | FR-021 |
+| DELETE /api/comparisons/{id} | FR-022, FR-016 |
+| DELETE /api/comparisons | FR-022, FR-016 |
 | GET /api/comparisons/{id}/stream | FR-008, FR-009, FR-010, FR-011, FR-012, FR-013, FR-019 |
 | GET /api/comparisons | FR-015, FR-016, FR-017 |
 | GET /api/comparisons/{id} | FR-014, FR-015, FR-016, FR-019 |
