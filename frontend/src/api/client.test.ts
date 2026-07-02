@@ -2,7 +2,9 @@ import { describe, expect, it, beforeEach } from 'vitest'
 import { http, HttpResponse, server } from '../../testing/server'
 import {
   ApiError,
+  clearComparisons,
   createComparison,
+  deleteComparison,
   getProviders,
   listComparisons,
   login,
@@ -137,5 +139,49 @@ describe('api client', () => {
     const items = await listComparisons()
     expect(items).toHaveLength(1)
     expect(items[0].id).toBe('c1')
+  })
+
+  it('deletes one comparison via DELETE with the CSRF header (FR-022)', async () => {
+    document.cookie = 'XSRF-TOKEN=tok-del'
+    let method: string | null = null
+    let header: string | null = null
+    server.use(
+      http.delete('/api/comparisons/c1', ({ request }) => {
+        method = request.method
+        header = request.headers.get('X-XSRF-TOKEN')
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    await expect(deleteComparison('c1')).resolves.toBeUndefined()
+    expect(method).toBe('DELETE')
+    expect(header).toBe('tok-del')
+  })
+
+  it('clears the whole history via DELETE with the CSRF header (FR-022)', async () => {
+    document.cookie = 'XSRF-TOKEN=tok-clear'
+    let method: string | null = null
+    let header: string | null = null
+    server.use(
+      http.delete('/api/comparisons', ({ request }) => {
+        method = request.method
+        header = request.headers.get('X-XSRF-TOKEN')
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    await expect(clearComparisons()).resolves.toBeUndefined()
+    expect(method).toBe('DELETE')
+    expect(header).toBe('tok-clear')
+  })
+
+  it('surfaces the contract error when a deletion is rejected', async () => {
+    server.use(
+      http.delete('/api/comparisons/gone', () =>
+        HttpResponse.json({ error: 'not_found' }, { status: 404 }),
+      ),
+    )
+    await expect(deleteComparison('gone')).rejects.toMatchObject({
+      code: 'not_found',
+      status: 404,
+    })
   })
 })

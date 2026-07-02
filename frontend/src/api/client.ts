@@ -95,3 +95,16 @@ export async function listComparisons(): Promise<ComparisonSummary[]> {
   )
   return data.comparisons
 }
+
+/** Permanently delete one owned comparison and everything recorded for it (FR-022). */
+export function deleteComparison(id: string): Promise<void> {
+  return request<void>(`/api/comparisons/${id}`, {
+    method: 'DELETE',
+    csrf: true,
+  })
+}
+
+/** Permanently clear the caller's entire history — idempotent 204 (FR-022). */
+export function clearComparisons(): Promise<void> {
+  return request<void>('/api/comparisons', { method: 'DELETE', csrf: true })
+}
