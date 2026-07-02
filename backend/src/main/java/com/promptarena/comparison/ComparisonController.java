@@ -14,6 +14,7 @@ import com.promptarena.dto.CreateComparisonResponse;
 import com.promptarena.dto.DoneEvent;
 import com.promptarena.dto.ProviderCatalogEntry;
 import com.promptarena.dto.ResultEvent;
+import com.promptarena.dto.StatsResponse;
 import com.promptarena.model.Comparison;
 import com.promptarena.model.Provider;
 import com.promptarena.model.ProviderResult;
@@ -119,6 +120,17 @@ public class ComparisonController {
                         comparison.getCreatedAt()))
             .toList();
     return new ComparisonListResponse(items);
+  }
+
+  /**
+   * Per-provider aggregate statistics over the caller's own recorded results, derived at read time
+   * from the raw rows — nothing persisted (FR-023, FR-016). A caller with no history gets an empty
+   * list. The literal path is mapped before Spring considers the {@code /{id}} detail route.
+   */
+  @GetMapping("/stats")
+  public StatsResponse stats() {
+    return new StatsResponse(
+        ProviderStatsAggregator.aggregate(comparisons.findStatsRowsByUser(currentUser.require())));
   }
 
   /**

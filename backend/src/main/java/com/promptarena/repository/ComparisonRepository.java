@@ -5,6 +5,8 @@ import com.promptarena.model.User;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface ComparisonRepository extends JpaRepository<Comparison, String> {
 
@@ -20,4 +22,19 @@ public interface ComparisonRepository extends JpaRepository<Comparison, String> 
    * inside a caller-provided transaction.
    */
   void deleteByUser(User user);
+
+  /**
+   * Every provider-result row recorded for {@code user}'s comparisons, projected down to the
+   * telemetry the FR-023 aggregates need. Joining through the owning comparison scopes the rows
+   * strictly to the caller (FR-016); the aggregation itself happens in Java at read time — nothing
+   * is persisted for it.
+   */
+  @Query(
+      """
+      select new com.promptarena.repository.ProviderStatsRow(
+          r.provider, r.outcome, r.responseTimeMs, r.firstTokenMs, r.outputTokens)
+      from ProviderResult r
+      where r.comparison.user = :user
+      """)
+  List<ProviderStatsRow> findStatsRowsByUser(@Param("user") User user);
 }
