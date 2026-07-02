@@ -2,12 +2,12 @@ import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
-import { ModelSelect } from './ModelSelect'
+import { MODEL_PLACEHOLDER, ModelSelect } from './ModelSelect'
 
-const OPTIONS = ['alpha-1', 'beta-2', 'm-default']
+const OPTIONS = ['alpha-1', 'beta-2', 'gamma-3']
 
 function Harness({
-  initial = 'm-default',
+  initial = '',
   onChange = () => {},
 }: {
   initial?: string
@@ -20,7 +20,6 @@ function Harness({
       label="Modelo de Gemini"
       value={value}
       options={OPTIONS}
-      defaultModel="m-default"
       onChange={(model) => {
         setValue(model)
         onChange(model)
@@ -32,19 +31,50 @@ function Harness({
 const combo = () => screen.getByRole('combobox', { name: 'Modelo de Gemini' })
 
 describe('ModelSelect', () => {
-  it('shows the selected model closed, and opens a marked listbox on click', async () => {
+  it('starts empty with a placeholder — no model is preselected', async () => {
     render(<Harness />)
     const input = combo()
-    expect(input).toHaveValue('m-default')
+    expect(input).toHaveValue('')
+    expect(input).toHaveAttribute('placeholder', MODEL_PLACEHOLDER)
     expect(input).toHaveAttribute('aria-expanded', 'false')
+
+    await userEvent.click(input)
+    const options = screen.getAllByRole('option')
+    expect(options).toHaveLength(3)
+    // Nothing is selected and nothing is marked as a default.
+    for (const option of options) {
+      expect(option).toHaveAttribute('aria-selected', 'false')
+    }
+    expect(screen.queryByText('padrão')).not.toBeInTheDocument()
+    // The active descendant starts on the first option.
+    expect(input).toHaveAttribute('aria-activedescendant', options[0].id)
+  })
+
+  it('stays empty when an unchosen combo loses focus — no auto-pick', async () => {
+    const onChange = vi.fn()
+    render(
+      <div>
+        <Harness onChange={onChange} />
+        <button type="button">fora</button>
+      </div>,
+    )
+    const input = combo()
+    await userEvent.click(input)
+    await userEvent.click(screen.getByRole('button', { name: 'fora' }))
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    expect(input).toHaveValue('')
+    expect(input).toHaveAttribute('placeholder', MODEL_PLACEHOLDER)
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('shows the chosen model closed, flagging its option when opened', async () => {
+    render(<Harness initial="gamma-3" />)
+    const input = combo()
+    expect(input).toHaveValue('gamma-3')
 
     await userEvent.click(input)
     expect(input).toHaveAttribute('aria-expanded', 'true')
     const options = screen.getAllByRole('option')
-    expect(options).toHaveLength(3)
-    // The catalog default is marked "padrão"; the selected option is flagged.
-    expect(options[2]).toHaveTextContent('padrão')
     expect(options[2]).toHaveAttribute('aria-selected', 'true')
     expect(options[0]).toHaveAttribute('aria-selected', 'false')
     // The active descendant starts on the selected model.
@@ -52,11 +82,11 @@ describe('ModelSelect', () => {
   })
 
   it('filters options live and reports when nothing matches', async () => {
-    render(<Harness />)
+    render(<Harness initial="gamma-3" />)
     const input = combo()
     await userEvent.type(input, 'beta')
     expect(screen.getAllByRole('option')).toHaveLength(1)
-    expect(screen.getByRole('option', { name: /beta-2/ })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'beta-2' })).toBeInTheDocument()
 
     await userEvent.clear(input)
     await userEvent.type(input, 'zzz')
@@ -70,10 +100,10 @@ describe('ModelSelect', () => {
 
   it('selects with ArrowDown + Enter, wrapping past the end', async () => {
     const onChange = vi.fn()
-    render(<Harness onChange={onChange} />)
+    render(<Harness initial="gamma-3" onChange={onChange} />)
     const input = combo()
     await userEvent.click(input)
-    // Active starts at m-default (last) — ArrowDown wraps to the first.
+    // Active starts at gamma-3 (last) — ArrowDown wraps to the first.
     await userEvent.keyboard('{ArrowDown}')
     expect(input).toHaveAttribute(
       'aria-activedescendant',
@@ -100,7 +130,7 @@ describe('ModelSelect', () => {
     )
     // ArrowUp wraps from the first option to the last.
     await userEvent.keyboard('{ArrowUp}{Enter}')
-    expect(onChange).toHaveBeenCalledWith('m-default')
+    expect(onChange).toHaveBeenCalledWith('gamma-3')
   })
 
   it('opens on ArrowUp from a closed, focused combo', async () => {
@@ -121,7 +151,7 @@ describe('ModelSelect', () => {
 
   it('Escape closes without changing the selection', async () => {
     const onChange = vi.fn()
-    render(<Harness onChange={onChange} />)
+    render(<Harness initial="gamma-3" onChange={onChange} />)
     const input = combo()
     await userEvent.click(input)
     // A second click on the already-open combo keeps it open.
@@ -130,7 +160,7 @@ describe('ModelSelect', () => {
     await userEvent.keyboard('{Escape}')
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
     expect(onChange).not.toHaveBeenCalled()
-    expect(input).toHaveValue('m-default')
+    expect(input).toHaveValue('gamma-3')
   })
 
   it('closes on blur, and selects by mouse without losing the click to blur', async () => {
@@ -143,7 +173,7 @@ describe('ModelSelect', () => {
     )
     const input = combo()
     await userEvent.click(input)
-    await userEvent.click(screen.getByRole('option', { name: /beta-2/ }))
+    await userEvent.click(screen.getByRole('option', { name: 'beta-2' }))
     expect(onChange).toHaveBeenCalledWith('beta-2')
     expect(input).toHaveValue('beta-2')
 

@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { http, HttpResponse, server } from '../../testing/server'
+import { delay } from 'msw'
+import {
+  http,
+  HttpResponse,
+  providerCatalog,
+  server,
+} from '../../testing/server'
 import { renderApp } from '../../testing/render'
 
 async function reachComposer() {
@@ -9,6 +15,21 @@ async function reachComposer() {
   await screen.findByRole('heading', {
     name: /O que os modelos devem responder/,
   })
+}
+
+/** Wait for the provider catalog to land — cards become armable. */
+async function catalogReady() {
+  await waitFor(() =>
+    expect(screen.getByRole('checkbox', { name: 'Gemini' })).toBeEnabled(),
+  )
+}
+
+/** Open a provider's model combo box and pick an option. */
+async function pickModel(provider: string, model: RegExp) {
+  await userEvent.click(
+    screen.getByRole('combobox', { name: `Modelo de ${provider}` }),
+  )
+  await userEvent.click(await screen.findByRole('option', { name: model }))
 }
 
 afterEach(() => {
@@ -49,8 +70,20 @@ describe('ComposerPage', () => {
     )
   })
 
+  it('blocks running while an armed provider has no chosen model (FR-020)', async () => {
+    await reachComposer()
+    await catalogReady()
+    await userEvent.type(screen.getByLabelText('Prompt'), 'Oi')
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Gemini' }))
+    await userEvent.click(screen.getByRole('button', { name: /Comparar/ }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Escolha a versão de cada modelo selecionado.',
+    )
+  })
+
   it('arms and disarms a contender card, tracking the order badge', async () => {
     await reachComposer()
+    await catalogReady()
     expect(screen.getByText(/0 ESCOLHIDO/)).toBeInTheDocument()
     await userEvent.click(screen.getByRole('checkbox', { name: 'Gemini' }))
     expect(screen.getByText(/1 ESCOLHIDO/)).toBeInTheDocument()
@@ -63,7 +96,20 @@ describe('ComposerPage', () => {
   })
 
   it('prevents selecting a fifth provider', async () => {
+    // All five providers must be armable to exercise the 4-of-5 limit.
+    server.use(
+      http.get('/api/providers', () =>
+        HttpResponse.json({
+          providers: providerCatalog.map((p) =>
+            p.models.length > 0
+              ? p
+              : { ...p, configured: true, models: ['grok-2-latest'] },
+          ),
+        }),
+      ),
+    )
     await reachComposer()
+    await catalogReady()
     for (const name of ['Gemini', 'ChatGPT', 'Claude', 'Grok']) {
       await userEvent.click(screen.getByRole('checkbox', { name }))
     }
@@ -71,49 +117,89 @@ describe('ComposerPage', () => {
     expect(screen.getByRole('checkbox', { name: 'DeepSeek' })).toBeDisabled()
   })
 
-  it('offers the catalog models in an armed card’s combo box', async () => {
+  it('offers exactly the catalog models in an unchosen combo box', async () => {
     await reachComposer()
+    await catalogReady()
     await userEvent.click(screen.getByRole('checkbox', { name: 'Gemini' }))
     const combo = screen.getByRole('combobox', { name: 'Modelo de Gemini' })
-    expect(combo).toHaveValue('gemini-2.5-flash')
+    // No default: the combo starts empty with a placeholder (FR-020).
+    expect(combo).toHaveValue('')
+    expect(combo).toHaveAttribute('placeholder', 'selecionar modelo…')
     await userEvent.click(combo)
-    // Live catalog entries beyond the static fallback, default marked.
-    const pro = await screen.findByRole('option', { name: /gemini-2\.5-pro/ })
-    expect(pro).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: /padrão/ })).toHaveTextContent(
-      'gemini-2.5-flash',
-    )
+    expect(await screen.findAllByRole('option')).toHaveLength(4)
+    expect(
+      screen.getByRole('option', { name: 'gemini-2.5-pro' }),
+    ).toBeInTheDocument()
+    // Nothing is marked as a default — no default exists.
+    expect(screen.queryByText('padrão')).not.toBeInTheDocument()
   })
 
-  it('hints unconfigured providers from the catalog (armable all the same)', async () => {
+  it('renders an unconfigured provider as unavailable, not armable', async () => {
     await reachComposer()
     expect(await screen.findByText('não configurado')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Grok' }))
-    expect(screen.getByText('1º')).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Grok' })).toBeDisabled()
   })
 
-  it('keeps composing on static defaults when the catalog fetch fails', async () => {
+  it('renders a configured provider with an empty model list as unavailable', async () => {
     server.use(
       http.get('/api/providers', () =>
-        HttpResponse.json({ error: 'boom' }, { status: 500 }),
+        HttpResponse.json({
+          providers: providerCatalog.map((p) =>
+            p.provider === 'DEEPSEEK' ? { ...p, models: [] } : p,
+          ),
+        }),
       ),
     )
     await reachComposer()
-    await userEvent.click(screen.getByRole('checkbox', { name: 'ChatGPT' }))
-    expect(
-      screen.getByRole('combobox', { name: 'Modelo de ChatGPT' }),
-    ).toHaveValue('gpt-4o-mini')
+    expect(await screen.findByText('modelos indisponíveis')).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'DeepSeek' })).toBeDisabled()
+  })
+
+  it('keeps every card neutral and unarmable while the catalog loads', async () => {
+    server.use(
+      http.get('/api/providers', async () => {
+        await delay('infinite')
+        return HttpResponse.json({ providers: [] })
+      }),
+    )
+    await reachComposer()
+    expect(screen.getAllByText('…')).toHaveLength(5)
+    expect(screen.getByRole('checkbox', { name: 'Gemini' })).toBeDisabled()
     expect(screen.queryByText('não configurado')).not.toBeInTheDocument()
+  })
+
+  it('surfaces a catalog failure with a retry that reloads the models', async () => {
+    server.use(
+      http.get(
+        '/api/providers',
+        () => HttpResponse.json({ error: 'boom' }, { status: 500 }),
+        { once: true },
+      ),
+    )
+    await reachComposer()
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Não foi possível carregar os modelos dos provedores.',
+    )
+    expect(screen.getByRole('checkbox', { name: 'Gemini' })).toBeDisabled()
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'tentar novamente' }),
+    )
+    await catalogReady()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('runs a comparison, holding the launch overlay before the arena', async () => {
     await reachComposer()
+    await catalogReady()
     await userEvent.type(
       screen.getByLabelText('Prompt'),
       'Explain entanglement',
     )
     await userEvent.click(screen.getByRole('checkbox', { name: 'Claude' }))
+    await pickModel('Claude', /claude-3-5-sonnet-latest/)
     await userEvent.click(screen.getByRole('checkbox', { name: 'Gemini' }))
+    await pickModel('Gemini', /gemini-2\.5-flash-lite/)
     await userEvent.click(screen.getByRole('button', { name: /Comparar/ }))
     expect(await screen.findByRole('status')).toHaveTextContent(
       'INICIANDO TRANSMISSÃO · 2 MODELOS',
@@ -127,7 +213,7 @@ describe('ComposerPage', () => {
     )
   })
 
-  it('sends the armed providers’ models and passes them to the arena', async () => {
+  it('sends the explicit model picks and passes them to the arena', async () => {
     stubReducedMotion()
     let body: { models?: Record<string, string> } | null = null
     server.use(
@@ -143,13 +229,10 @@ describe('ComposerPage', () => {
       ),
     )
     await reachComposer()
+    await catalogReady()
     await userEvent.type(screen.getByLabelText('Prompt'), 'Oi')
     await userEvent.click(screen.getByRole('checkbox', { name: 'Gemini' }))
-    const combo = screen.getByRole('combobox', { name: 'Modelo de Gemini' })
-    await userEvent.click(combo)
-    await userEvent.click(
-      await screen.findByRole('option', { name: /gemini-2\.5-pro/ }),
-    )
+    await pickModel('Gemini', /gemini-2\.5-pro/)
     await userEvent.click(screen.getByRole('button', { name: /Comparar/ }))
     const gemini = await screen.findByRole('region', { name: 'Gemini' })
     expect(body!.models).toEqual({ GEMINI: 'gemini-2.5-pro' })
@@ -164,11 +247,13 @@ describe('ComposerPage', () => {
       ),
     )
     await reachComposer()
+    await catalogReady()
     await userEvent.type(
       screen.getByLabelText('Prompt'),
       'Explain entanglement',
     )
     await userEvent.click(screen.getByRole('checkbox', { name: 'Claude' }))
+    await pickModel('Claude', /claude-3-5-sonnet-latest/)
     await userEvent.click(screen.getByRole('button', { name: /Comparar/ }))
     expect(await screen.findByRole('alert')).toHaveTextContent(
       /Não foi possível iniciar a comparação/,

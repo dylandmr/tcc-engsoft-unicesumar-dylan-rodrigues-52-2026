@@ -7,27 +7,27 @@ interface ModelSelectProps {
   providerId: ProviderId
   /** Accessible name, e.g. "Modelo de Gemini". */
   label: string
-  /** Currently selected model id. */
+  /** The user's explicit pick — empty string until they choose (FR-020). */
   value: string
   /** Selectable models (provider catalog; live lists can be 40+ entries). */
   options: string[]
-  /** The catalog default — its option is marked "padrão". */
-  defaultModel: string
   onChange: (model: string) => void
 }
 
+/** Shown while no model has been chosen — there is no default (FR-020). */
+export const MODEL_PLACEHOLDER = 'selecionar modelo…'
+
 /**
- * Per-provider model combo box (FR-020): a mono text field that shows the
- * selected model and, when opened, filters the provider's catalog live.
- * ARIA 1.2 editable-combobox pattern — the input is the combobox, the popup
- * is a listbox navigated via aria-activedescendant.
+ * Per-provider model combo box (FR-020): a mono text field that starts empty
+ * (the user must choose — no default) and, when opened, filters the
+ * provider's catalog live. ARIA 1.2 editable-combobox pattern — the input is
+ * the combobox, the popup is a listbox navigated via aria-activedescendant.
  */
 export function ModelSelect({
   providerId,
   label,
   value,
   options,
-  defaultModel,
   onChange,
 }: ModelSelectProps) {
   const style = PROVIDER_STYLES[providerId]
@@ -47,6 +47,8 @@ export function ModelSelect({
     setActive(Math.max(0, options.indexOf(value)))
     setOpen(true)
   }
+  // Closing never auto-picks: an empty-value combo that loses focus stays
+  // empty — the choice is always the user's (FR-020).
   const close = () => {
     setOpen(false)
     setFilter('')
@@ -97,7 +99,7 @@ export function ModelSelect({
         spellCheck={false}
         autoComplete="off"
         value={open ? filter : value}
-        placeholder={value}
+        placeholder={value || MODEL_PLACEHOLDER}
         onChange={(event) => {
           setFilter(event.target.value)
           setActive(0)
@@ -140,19 +142,14 @@ export function ModelSelect({
                 select(model)
               }}
               className={cn(
-                'flex cursor-pointer items-center justify-between gap-2 px-3 py-1.5 font-mono text-xs',
+                'cursor-pointer truncate px-3 py-1.5 font-mono text-xs',
                 index === active
                   ? cn(style.chipBg, 'text-bright')
                   : 'text-mist',
                 model === value && style.text,
               )}
             >
-              <span className="truncate">{model}</span>
-              {model === defaultModel && (
-                <span className="flex-none text-[10px] text-mist/70">
-                  padrão
-                </span>
-              )}
+              {model}
             </li>
           ))}
         </ul>

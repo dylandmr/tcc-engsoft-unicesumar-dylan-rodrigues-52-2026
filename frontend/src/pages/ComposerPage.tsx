@@ -64,20 +64,36 @@ export function ComposerPage() {
                 {`${chosen} ${chosen === 1 ? 'ESCOLHIDO' : 'ESCOLHIDOS'}`}
               </span>
             </div>
+            {c.catalogState === 'error' && (
+              <div
+                role="alert"
+                className="mt-3.5 flex items-center justify-between gap-4 rounded-[var(--radius-panel)] border border-error/40 bg-error/5 px-4 py-3"
+              >
+                <p className="font-body text-sm text-error">
+                  Não foi possível carregar os modelos dos provedores.
+                </p>
+                <button
+                  type="button"
+                  onClick={c.retryCatalog}
+                  className="whitespace-nowrap font-mono text-xs text-bright underline-offset-4 hover:underline"
+                >
+                  tentar novamente
+                </button>
+              </div>
+            )}
             <div className="mt-3.5 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
               {PROVIDERS.map((meta) => {
-                const entry = c.catalog[meta.id]
                 const order = c.selected.indexOf(meta.id)
                 return (
                   <ContenderCard
                     key={meta.id}
                     meta={meta}
                     order={order}
-                    configured={entry.configured}
+                    loading={c.catalogState !== 'ready'}
+                    unavailableHint={c.unavailableHint(meta.id)}
                     disabled={order < 0 && c.full}
                     model={c.modelFor(meta.id)}
-                    models={entry.models}
-                    defaultModel={entry.defaultModel}
+                    models={c.catalog[meta.id]?.models ?? []}
                     onToggle={() => c.toggle(meta.id)}
                     onModelChange={(model) => c.setModel(meta.id, model)}
                   />

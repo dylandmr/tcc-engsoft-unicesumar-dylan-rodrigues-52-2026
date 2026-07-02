@@ -1,11 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cn } from './cn'
-import {
-  DEFAULT_MODELS,
-  fallbackCatalog,
-  providerMeta,
-  PROVIDERS,
-} from './providers'
+import { providerMeta, PROVIDERS } from './providers'
 import { PROVIDER_STYLES } from './providerStyles'
 import { laneStatusInfo } from './laneStatus'
 import { prefersReducedMotion } from './motion'
@@ -24,21 +19,6 @@ describe('providers', () => {
   it('has a style entry for every provider', () => {
     for (const p of PROVIDERS) {
       expect(PROVIDER_STYLES[p.id].dot).toContain(p.hue)
-    }
-  })
-})
-
-describe('fallbackCatalog', () => {
-  it('builds a curated, default-only, assumed-configured entry per provider', () => {
-    const catalog = fallbackCatalog()
-    for (const p of PROVIDERS) {
-      expect(catalog[p.id]).toEqual({
-        provider: p.id,
-        configured: true,
-        defaultModel: DEFAULT_MODELS[p.id],
-        models: [DEFAULT_MODELS[p.id]],
-        source: 'curated',
-      })
     }
   })
 })

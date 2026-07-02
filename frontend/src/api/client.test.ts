@@ -101,13 +101,22 @@ describe('api client', () => {
   it('fetches the provider catalog (FR-020)', async () => {
     const catalog = await getProviders()
     expect(catalog).toHaveLength(5)
-    expect(catalog[0]).toMatchObject({
+    expect(catalog[0]).toEqual({
       provider: 'GEMINI',
       configured: true,
-      defaultModel: 'gemini-2.5-flash',
-      source: 'live',
+      models: [
+        'gemini-2.0-flash',
+        'gemini-2.5-flash',
+        'gemini-2.5-flash-lite',
+        'gemini-2.5-pro',
+      ],
     })
-    expect(catalog[0].models).toContain('gemini-2.5-flash')
+    // Unconfigured providers report an empty model list — never a default.
+    expect(catalog[3]).toEqual({
+      provider: 'GROK',
+      configured: false,
+      models: [],
+    })
   })
 
   it('lists comparisons', async () => {

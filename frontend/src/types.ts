@@ -47,12 +47,12 @@ export interface ProviderCatalogEntry {
   provider: ProviderId
   /** Whether the server holds an API key for this provider. */
   configured: boolean
-  /** Model used when the user picks none. Always present in `models`. */
-  defaultModel: string
-  /** Selectable models — curated list ∪ the provider's live list. */
+  /**
+   * Exactly the models the provider's own API reports as available — empty
+   * for unconfigured providers and on live-fetch failure. A provider with no
+   * models cannot join a comparison.
+   */
   models: string[]
-  /** `live` when the provider's list API contributed entries. */
-  source: 'live' | 'curated'
 }
 
 /** A summary row from GET /api/comparisons. */

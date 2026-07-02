@@ -53,8 +53,10 @@ describe('PromptInput', () => {
 
 function renderCard(over: {
   order?: number
-  configured?: boolean
+  loading?: boolean
+  unavailableHint?: string | null
   disabled?: boolean
+  model?: string
   onToggle?: () => void
   onModelChange?: (model: string) => void
 }) {
@@ -62,11 +64,11 @@ function renderCard(over: {
     <ContenderCard
       meta={providerMeta('CLAUDE')}
       order={over.order ?? -1}
-      configured={over.configured ?? true}
+      loading={over.loading ?? false}
+      unavailableHint={over.unavailableHint ?? null}
       disabled={over.disabled ?? false}
-      model="claude-3-5-sonnet-latest"
+      model={over.model ?? ''}
       models={['claude-3-5-haiku-latest', 'claude-3-5-sonnet-latest']}
-      defaultModel="claude-3-5-sonnet-latest"
       onToggle={over.onToggle ?? (() => {})}
       onModelChange={over.onModelChange ?? (() => {})}
     />,
@@ -85,7 +87,7 @@ describe('ContenderCard', () => {
     expect(onToggle).toHaveBeenCalled()
   })
 
-  it('renders an armed card with its order badge and model combo box', () => {
+  it('renders an armed card whose combo box starts unchosen', () => {
     renderCard({ order: 1 })
     expect(screen.getByRole('checkbox', { name: 'Claude' })).toHaveAttribute(
       'aria-checked',
@@ -93,6 +95,13 @@ describe('ContenderCard', () => {
     )
     expect(screen.getByText('2º')).toBeInTheDocument()
     expect(screen.queryByText('+')).not.toBeInTheDocument()
+    const combo = screen.getByRole('combobox', { name: 'Modelo de Claude' })
+    expect(combo).toHaveValue('')
+    expect(combo).toHaveAttribute('placeholder', 'selecionar modelo…')
+  })
+
+  it('shows the chosen model once the user has picked one', () => {
+    renderCard({ order: 0, model: 'claude-3-5-sonnet-latest' })
     expect(
       screen.getByRole('combobox', { name: 'Modelo de Claude' }),
     ).toHaveValue('claude-3-5-sonnet-latest')
@@ -108,12 +117,18 @@ describe('ContenderCard', () => {
     expect(onModelChange).toHaveBeenCalledWith('claude-3-5-haiku-latest')
   })
 
-  it('hints an unconfigured provider yet keeps it armable', async () => {
-    const onToggle = vi.fn()
-    renderCard({ configured: false, onToggle })
+  it('renders an unavailable card as dimmed, hinted and not armable', () => {
+    renderCard({ unavailableHint: 'não configurado' })
     expect(screen.getByText('não configurado')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Claude' }))
-    expect(onToggle).toHaveBeenCalled()
+    expect(screen.queryByText('+')).not.toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Claude' })).toBeDisabled()
+  })
+
+  it('renders a neutral, not-armable card while the catalog loads', () => {
+    renderCard({ loading: true })
+    expect(screen.getByText('…')).toBeInTheDocument()
+    expect(screen.queryByText('+')).not.toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Claude' })).toBeDisabled()
   })
 
   it('is disabled while idle when the grid is full', () => {
