@@ -135,10 +135,17 @@ body {
   animation: page-in 0.3s ease-out both;
 }
 
-/* Keyboard focus is always visible, in the house accent. */
-:focus-visible {
-  outline: 2px solid var(--color-ignition);
-  outline-offset: 2px;
+/*
+ * Keyboard focus is always visible on click-to-act controls, in the house
+ * accent. Text fields are excluded — they carry their own focus treatment
+ * (panel border / ring) and a second outline would double-indicate. Layered
+ * (`base`) + zero-specificity (`:where`) so component utilities can override.
+ */
+@layer base {
+  :where(a, button, [role='button'], summary):focus-visible {
+    outline: 2px solid var(--color-ignition);
+    outline-offset: 2px;
+  }
 }
 
 /* Motion insurance — collapse every animation/transition for users who opt out. */
