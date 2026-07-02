@@ -1,0 +1,18 @@
+# Keep the Docker build context small and reproducible
+.git/
+**/node_modules/
+**/target/
+frontend/dist/
+frontend/coverage/
+data/
+*.db
+*.db-*
+.env
+.env.*
+!.env.example
+**/*.log
+.claude/
+specs/
+design/
+docs/
+.specify/

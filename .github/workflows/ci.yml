@@ -1,0 +1,141 @@
+name: CI
+
+# Quality gate for every PR into develop/main and every feature push (Constitution v1.2.0+).
+on:
+  push:
+  pull_request:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend · build, test, coverage gate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Set up JDK 21
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: mvn verify (tests + JaCoCo 100% gate)
+        run: ./mvnw -B --no-transfer-progress verify
+
+  frontend:
+    name: Frontend · build, test, coverage gate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Set up Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install deps
+        run: npm ci
+      - name: Test + coverage gate (Vitest 100%)
+        run: npm run test:coverage
+      - name: Build
+        run: npm run build
+
+  semgrep:
+    name: Security · Semgrep (SAST/SCA/secrets)
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Semgrep scan (Java + TS)
+        run: semgrep scan --config p/default --config p/secrets --error --metrics off
+
+  docker:
+    name: Docker · image build + smoke test + Trivy scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Build image
+        run: docker build -t prompt-arena:ci .
+      - name: Trivy image scan (fail on CRITICAL, fixed)
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:latest image --severity CRITICAL --ignore-unfixed \
+            --exit-code 1 --no-progress prompt-arena:ci
+      - name: Run container
+        run: docker run -d --name pa -p 8080:8080 prompt-arena:ci
+      - name: Smoke test /api/health
+        run: |
+          for i in $(seq 1 40); do
+            if curl -fsS http://localhost:8080/api/health | grep -q '"status":"ok"'; then
+              echo "container healthy"; exit 0
+            fi
+            sleep 3
+          done
+          echo "health check failed; container logs:"; docker logs pa; exit 1
+      - name: Stop container
+        if: always()
+        run: docker rm -f pa || true
+
+  mutation-backend:
+    name: Mutation · PIT (Java)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Set up JDK 21
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: PIT mutation coverage
+        run: ./mvnw -B --no-transfer-progress test-compile org.pitest:pitest-maven:mutationCoverage
+
+  mutation-frontend:
+    name: Mutation · Stryker (TS)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Set up Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install deps
+        run: npm ci
+      - name: Stryker mutation run
+        run: npx stryker run
+
+  sonarcloud:
+    name: Quality · SonarCloud
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+      - name: SonarCloud scan
+        if: ${{ env.SONAR_TOKEN != '' }}
+        # The pinned 40-hex action SHA below pattern-matches the SonarQube-key secrets rule.
+        uses: SonarSource/sonarqube-scan-action@2f77a1ec69fb1d595b06f35ab27e97605bdef703 # v5.3.2 nosemgrep
+        env:
+          SONAR_HOST_URL: https://sonarcloud.io
+      - name: Notice — SonarCloud disabled
+        if: ${{ env.SONAR_TOKEN == '' }}
+        run: echo "SONAR_TOKEN not set — SonarCloud scan skipped. Add the repo secret to enable (see sonar-project.properties)."
