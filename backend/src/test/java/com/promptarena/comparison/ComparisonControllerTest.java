@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.promptarena.auth.CurrentUserService;
+import com.promptarena.catalog.ModelCatalogService;
 import com.promptarena.dto.ResultEvent;
 import com.promptarena.model.Comparison;
 import com.promptarena.model.Outcome;
@@ -41,12 +42,14 @@ class ComparisonControllerTest {
   @Mock private ComparisonService comparisonService;
   @Mock private CurrentUserService currentUser;
   @Mock private ComparisonRepository comparisons;
+  @Mock private ModelCatalogService modelCatalog;
 
   /** Runs the stream task inline so behavior is deterministic. */
   private final Executor inline = Runnable::run;
 
   private ComparisonController controller() {
-    return new ComparisonController(comparisonService, currentUser, comparisons, inline, 8000);
+    return new ComparisonController(
+        comparisonService, currentUser, comparisons, modelCatalog, inline, 8000);
   }
 
   private static ResultEvent sampleEvent() {

@@ -98,7 +98,8 @@ class ComparisonServiceTest {
     List<ProviderResponse> emitted = new CopyOnWriteArrayList<>();
 
     List<ProviderResponse> responses =
-        service(45_000).fanOut(providers, new PromptRequest("hi"), (p, t) -> {}, emitted::add);
+        service(45_000)
+            .fanOut(providers, provider -> new PromptRequest("hi"), (p, t) -> {}, emitted::add);
 
     assertThat(responses).extracting(ProviderResponse::outcome).containsOnly(Outcome.SUCCESS);
     assertThat(emitted).hasSize(3);
@@ -113,7 +114,7 @@ class ComparisonServiceTest {
     service(45_000)
         .fanOut(
             providers,
-            new PromptRequest("hi"),
+            provider -> new PromptRequest("hi"),
             (provider, token) -> tokens.merge(provider, token, String::concat),
             r -> {});
 
@@ -178,7 +179,8 @@ class ComparisonServiceTest {
                     })));
 
     List<ProviderResponse> responses =
-        service(45_000).fanOut(providers, new PromptRequest("hi"), (p, t) -> {}, r -> {});
+        service(45_000)
+            .fanOut(providers, provider -> new PromptRequest("hi"), (p, t) -> {}, r -> {});
 
     assertThat(responses).extracting(ProviderResponse::outcome).containsOnly(Outcome.ERROR);
   }
@@ -225,6 +227,46 @@ class ComparisonServiceTest {
   }
 
   @Test
+  void executeDispatchesThePersistedModelPerProvider() {
+    User user = new User("alice", "hash");
+    // CLAUDE has a persisted model choice (FR-020); GEMINI predates model selection (no entry).
+    Comparison comparison =
+        new Comparison(
+            user,
+            "prompt",
+            List.of(Provider.CLAUDE, Provider.GEMINI),
+            Map.of(Provider.CLAUDE, "claude-haiku-4-5"));
+    when(comparisons.findById("c1")).thenReturn(Optional.of(comparison));
+    Map<Provider, PromptRequest> seen = new ConcurrentHashMap<>();
+    register(
+        Map.of(
+            Provider.CLAUDE, capturing(Provider.CLAUDE, seen),
+            Provider.GEMINI, capturing(Provider.GEMINI, seen)));
+
+    service(45_000).execute("c1", (p, t) -> {}, event -> {});
+
+    assertThat(seen.get(Provider.CLAUDE).model()).isEqualTo("claude-haiku-4-5");
+    assertThat(seen.get(Provider.CLAUDE).prompt()).isEqualTo("prompt");
+    assertThat(seen.get(Provider.GEMINI).model()).isNull();
+  }
+
+  /** An adapter that records the exact {@link PromptRequest} it was dispatched with. */
+  private static LlmProvider capturing(Provider id, Map<Provider, PromptRequest> seen) {
+    return new LlmProvider() {
+      @Override
+      public Provider id() {
+        return id;
+      }
+
+      @Override
+      public ProviderResponse stream(PromptRequest request, java.util.function.Consumer<String> t) {
+        seen.put(id, request);
+        return ok(id);
+      }
+    };
+  }
+
+  @Test
   void executeThrowsWhenComparisonMissing() {
     when(comparisons.findById("gone")).thenReturn(Optional.empty());
 
@@ -263,7 +305,7 @@ class ComparisonServiceTest {
     Map<Provider, Outcome> outcomes = new ConcurrentHashMap<>();
     service.fanOut(
         providers,
-        new PromptRequest("hi"),
+        provider -> new PromptRequest("hi"),
         (p, t) -> {},
         response -> outcomes.put(response.provider(), response.outcome()));
     return outcomes;

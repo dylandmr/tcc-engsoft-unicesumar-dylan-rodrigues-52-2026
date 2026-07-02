@@ -2,7 +2,12 @@ package com.promptarena.provider.openai;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.anyUrl;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.options;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -36,7 +41,31 @@ class OpenAiCompatibleProviderTest {
   }
 
   private OpenAiCompatibleProvider provider(String apiKey) {
-    return new OpenAiCompatibleProvider(Provider.CHATGPT, apiKey, "gpt-test", baseUrl);
+    return provider(Provider.CHATGPT, apiKey);
+  }
+
+  private OpenAiCompatibleProvider provider(Provider id, String apiKey) {
+    return new OpenAiCompatibleProvider(id, apiKey, "gpt-test", baseUrl);
+  }
+
+  /** Mirrors the live OpenAI-style {@code GET /v1/models} list shape for the given model ids. */
+  private void stubModelList(String... ids) {
+    StringBuilder data = new StringBuilder();
+    for (String id : ids) {
+      if (data.length() > 0) {
+        data.append(',');
+      }
+      data.append("{\"id\":\"")
+          .append(id)
+          .append("\",\"object\":\"model\",\"created\":1700000000,\"owned_by\":\"system\"}");
+    }
+    server.stubFor(
+        get(urlPathEqualTo("/models"))
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withHeader("Content-Type", "application/json")
+                    .withBody("{\"object\":\"list\",\"data\":[" + data + "]}")));
   }
 
   /** A JSON error response (non-streaming) — the SDK raises, mapping to ERROR. */
@@ -188,5 +217,60 @@ class OpenAiCompatibleProviderTest {
 
     assertThat(response.outcome()).isEqualTo(Outcome.ERROR);
     assertThat(response.errorMessage()).isEqualTo("provider_not_configured");
+  }
+
+  @Test
+  void streamRequestsTheOverrideModelInsteadOfTheConfiguredOne() {
+    stubChatStream("Hello");
+
+    ProviderResponse response =
+        provider("test-key").stream(new PromptRequest("hi", "gpt-override"), token -> {});
+
+    assertThat(response.outcome()).isEqualTo(Outcome.SUCCESS);
+    server.verify(
+        postRequestedFor(anyUrl())
+            .withRequestBody(matchingJsonPath("$.model", equalTo("gpt-override"))));
+  }
+
+  @Test
+  void listModelsForChatgptKeepsChatFamiliesAndDropsModalityVariants() {
+    // gpt-*, chatgpt-* and o<N>* qualify; audio/image/embedding/etc. variants do not.
+    stubModelList(
+        "gpt-4o",
+        "chatgpt-4o-latest",
+        "o3-mini",
+        "gpt-4o-audio-preview",
+        "dall-e-3",
+        "whisper-1",
+        "text-embedding-3-small");
+
+    assertThat(provider("test-key").listModels())
+        .containsExactly("gpt-4o", "chatgpt-4o-latest", "o3-mini");
+  }
+
+  @Test
+  void listModelsForGrokKeepsOnlyGrokIds() {
+    stubModelList("grok-4", "grok-3-mini", "gpt-4o");
+
+    assertThat(provider(Provider.GROK, "test-key").listModels())
+        .containsExactly("grok-4", "grok-3-mini");
+  }
+
+  @Test
+  void listModelsForDeepseekKeepsOnlyDeepseekIds() {
+    stubModelList("deepseek-chat", "deepseek-reasoner", "grok-4");
+
+    assertThat(provider(Provider.DEEPSEEK, "test-key").listModels())
+        .containsExactly("deepseek-chat", "deepseek-reasoner");
+  }
+
+  @Test
+  void listModelsIsEmptyWhenUnconfigured() {
+    assertThat(provider(null).listModels()).isEmpty();
+  }
+
+  @Test
+  void defaultModelIsTheConfiguredModel() {
+    assertThat(provider("test-key").defaultModel()).isEqualTo("gpt-test");
   }
 }

@@ -11,11 +11,15 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.MapKeyColumn;
+import jakarta.persistence.MapKeyEnumerated;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /** A single submitted prompt and the set of providers it targeted (FR-014). */
@@ -47,6 +51,18 @@ public class Comparison {
   @Column(name = "provider", nullable = false)
   private List<Provider> providers = new ArrayList<>();
 
+  /**
+   * The model each selected provider runs, resolved at {@code POST} time (the user's explicit
+   * choice or the provider's configured default — FR-020). Comparisons persisted before model
+   * selection existed have no entries; dispatch then falls back to the provider's default.
+   */
+  @ElementCollection(fetch = FetchType.EAGER)
+  @CollectionTable(name = "comparison_models", joinColumns = @JoinColumn(name = "comparison_id"))
+  @MapKeyEnumerated(EnumType.STRING)
+  @MapKeyColumn(name = "provider")
+  @Column(name = "model", nullable = false)
+  private Map<Provider, String> models = new EnumMap<>(Provider.class);
+
   @Column(nullable = false)
   private Instant createdAt = Instant.now();
 
@@ -66,6 +82,12 @@ public class Comparison {
     this.user = user;
     this.prompt = prompt;
     this.providers = new ArrayList<>(providers);
+  }
+
+  public Comparison(
+      User user, String prompt, List<Provider> providers, Map<Provider, String> models) {
+    this(user, prompt, providers);
+    this.models.putAll(models);
   }
 
   public void addResult(ProviderResult result) {
@@ -95,6 +117,10 @@ public class Comparison {
 
   public List<Provider> getProviders() {
     return providers;
+  }
+
+  public Map<Provider, String> getModels() {
+    return models;
   }
 
   public Instant getCreatedAt() {

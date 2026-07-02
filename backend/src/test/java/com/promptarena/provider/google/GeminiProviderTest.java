@@ -2,7 +2,11 @@ package com.promptarena.provider.google;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.anyUrl;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.options;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -175,5 +179,57 @@ class GeminiProviderTest {
 
     assertThat(response.outcome()).isEqualTo(Outcome.ERROR);
     assertThat(response.errorMessage()).isEqualTo("provider_not_configured");
+  }
+
+  @Test
+  void streamRequestsTheOverrideModelInsteadOfTheConfiguredOne() {
+    stubGenerateStream("Hello");
+
+    ProviderResponse response =
+        provider("test-key").stream(new PromptRequest("hi", "gemini-override"), token -> {});
+
+    assertThat(response.outcome()).isEqualTo(Outcome.SUCCESS);
+    server.verify(
+        postRequestedFor(urlMatching(".*/models/gemini-override:streamGenerateContent.*")));
+  }
+
+  /**
+   * Mirrors the live {@code GET /v1beta/models} shape: the wire field is {@code
+   * supportedGenerationMethods} (the SDK exposes it as {@code supportedActions}), and model names
+   * carry the {@code models/} resource prefix.
+   */
+  @Test
+  void listModelsKeepsChatCapableIdsAndStripsTheModelsPrefix() {
+    server.stubFor(
+        get(urlPathEqualTo("/v1beta/models"))
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
+                        {"models":[
+                          {"name":"models/gemini-2.5-flash",
+                           "supportedGenerationMethods":["generateContent","countTokens"]},
+                          {"name":"models/text-embedding-004",
+                           "supportedGenerationMethods":["embedContent"]},
+                          {"name":"unprefixed-model",
+                           "supportedGenerationMethods":["generateContent"]},
+                          {"name":"models/no-methods-model"}
+                        ]}
+                        """)));
+
+    assertThat(provider("test-key").listModels())
+        .containsExactly("gemini-2.5-flash", "unprefixed-model");
+  }
+
+  @Test
+  void listModelsIsEmptyWhenUnconfigured() {
+    assertThat(provider(null).listModels()).isEmpty();
+  }
+
+  @Test
+  void defaultModelIsTheConfiguredModel() {
+    assertThat(provider("test-key").defaultModel()).isEqualTo("gemini-test");
   }
 }

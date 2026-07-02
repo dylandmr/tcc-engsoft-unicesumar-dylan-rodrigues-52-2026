@@ -47,4 +47,13 @@ class ProviderRegistryTest {
     assertThat(response.outcome()).isEqualTo(Outcome.ERROR);
     assertThat(response.errorMessage()).isEqualTo("provider_not_configured");
   }
+
+  /** The interface defaults (FR-020): no model list and no default model unless overridden. */
+  @Test
+  void unavailableProviderReportsNoModelsAndNoDefault() {
+    LlmProvider unavailable = new UnavailableProvider(Provider.GEMINI);
+
+    assertThat(unavailable.listModels()).isEmpty();
+    assertThat(unavailable.defaultModel()).isNull();
+  }
 }

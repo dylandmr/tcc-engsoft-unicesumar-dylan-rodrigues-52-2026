@@ -6,6 +6,7 @@ import com.openai.core.http.StreamResponse;
 import com.openai.models.chat.completions.ChatCompletionChunk;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import com.openai.models.chat.completions.ChatCompletionStreamOptions;
+import com.openai.models.models.Model;
 import com.promptarena.dto.PromptRequest;
 import com.promptarena.dto.ProviderResponse;
 import com.promptarena.dto.StreamTelemetry;
@@ -13,6 +14,7 @@ import com.promptarena.model.Provider;
 import com.promptarena.provider.LlmProvider;
 import com.promptarena.provider.ProviderResultMapper;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -35,6 +37,23 @@ public final class OpenAiCompatibleProvider implements LlmProvider {
   public static final String GROK_BASE_URL = "https://api.x.ai/v1";
   public static final String DEFAULT_DEEPSEEK_MODEL = "deepseek-chat";
   public static final String DEEPSEEK_BASE_URL = "https://api.deepseek.com";
+
+  /**
+   * OpenAI's {@code /models} mixes chat models with the other endpoints' models (audio, images,
+   * embeddings, …); any id containing one of these fragments is a non-chat modality variant.
+   */
+  private static final List<String> CHATGPT_EXCLUDED_FRAGMENTS =
+      List.of(
+          "audio",
+          "realtime",
+          "embedding",
+          "tts",
+          "whisper",
+          "moderation",
+          "image",
+          "dall-e",
+          "transcribe",
+          "search");
 
   private final Provider id;
   private final String model;
@@ -60,6 +79,41 @@ public final class OpenAiCompatibleProvider implements LlmProvider {
   }
 
   @Override
+  public String defaultModel() {
+    return model;
+  }
+
+  /**
+   * The chat-capable models this provider's own {@code GET /models} reports (FR-020), filtered per
+   * provider — the endpoint is unpaginated in the OpenAI SDK (javap-verified: {@code
+   * ModelListPage.hasNextPage()} is constant {@code false} in openai-java 4.41.0). May throw on an
+   * API failure — the model catalog isolates the fetch.
+   */
+  @Override
+  public List<String> listModels() {
+    if (client == null) {
+      return List.of();
+    }
+    return client.models().list().data().stream().map(Model::id).filter(this::servesChat).toList();
+  }
+
+  /** Whether {@code modelId} is a chat model of the specific provider this adapter serves. */
+  private boolean servesChat(String modelId) {
+    return switch (id) {
+      case CHATGPT -> isChatgptChatModel(modelId);
+      case GROK -> modelId.startsWith("grok");
+      default -> modelId.startsWith("deepseek");
+    };
+  }
+
+  /** Keep the chat families (gpt-*, chatgpt-*, o&lt;N&gt;*) and drop modality variants by name. */
+  private static boolean isChatgptChatModel(String modelId) {
+    boolean chatFamily =
+        modelId.startsWith("gpt-") || modelId.startsWith("chatgpt-") || modelId.matches("^o\\d.*");
+    return chatFamily && CHATGPT_EXCLUDED_FRAGMENTS.stream().noneMatch(modelId::contains);
+  }
+
+  @Override
   public ProviderResponse stream(PromptRequest request, Consumer<String> onToken) {
     if (client == null) {
       return ProviderResultMapper.error(id, "provider_not_configured", null);
@@ -75,7 +129,7 @@ public final class OpenAiCompatibleProvider implements LlmProvider {
     try {
       ChatCompletionCreateParams params =
           ChatCompletionCreateParams.builder()
-              .model(model)
+              .model(requestedModel(request))
               .addUserMessage(request.prompt())
               .streamOptions(ChatCompletionStreamOptions.builder().includeUsage(true).build())
               .build();
@@ -129,6 +183,11 @@ public final class OpenAiCompatibleProvider implements LlmProvider {
     } catch (RuntimeException ex) {
       return ProviderResultMapper.error(id, ex.getMessage(), elapsedMs(start));
     }
+  }
+
+  /** The per-comparison model choice (FR-020), or this adapter's configured default. */
+  private String requestedModel(PromptRequest request) {
+    return request.model() != null ? request.model() : model;
   }
 
   private static long elapsedMs(long startNanos) {

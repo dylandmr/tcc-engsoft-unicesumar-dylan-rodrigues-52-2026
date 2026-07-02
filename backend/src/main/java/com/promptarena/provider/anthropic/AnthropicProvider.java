@@ -8,6 +8,7 @@ import com.anthropic.models.messages.RawContentBlockDelta;
 import com.anthropic.models.messages.RawContentBlockDeltaEvent;
 import com.anthropic.models.messages.RawMessageStreamEvent;
 import com.anthropic.models.messages.TextDelta;
+import com.anthropic.models.models.ModelInfo;
 import com.promptarena.dto.PromptRequest;
 import com.promptarena.dto.ProviderResponse;
 import com.promptarena.dto.StreamTelemetry;
@@ -15,6 +16,7 @@ import com.promptarena.model.Provider;
 import com.promptarena.provider.LlmProvider;
 import com.promptarena.provider.ProviderResultMapper;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -56,6 +58,25 @@ public final class AnthropicProvider implements LlmProvider {
   }
 
   @Override
+  public String defaultModel() {
+    return model;
+  }
+
+  /**
+   * The models Anthropic's own {@code GET /v1/models} reports (FR-020) — every returned id is a
+   * chat-capable Messages model, so no filtering is needed (accessors javap-verified against
+   * anthropic-java 2.45.0: {@code ModelListPage.data()} / {@code ModelInfo.id()}). May throw on an
+   * API failure — the model catalog isolates the fetch.
+   */
+  @Override
+  public List<String> listModels() {
+    if (client == null) {
+      return List.of();
+    }
+    return client.models().list().data().stream().map(ModelInfo::id).toList();
+  }
+
+  @Override
   public ProviderResponse stream(PromptRequest request, Consumer<String> onToken) {
     if (client == null) {
       return ProviderResultMapper.error(Provider.CLAUDE, "provider_not_configured", null);
@@ -71,7 +92,7 @@ public final class AnthropicProvider implements LlmProvider {
     try {
       MessageCreateParams params =
           MessageCreateParams.builder()
-              .model(model)
+              .model(requestedModel(request))
               .maxTokens(MAX_TOKENS)
               .addUserMessage(request.prompt())
               .build();
@@ -122,6 +143,11 @@ public final class AnthropicProvider implements LlmProvider {
     } catch (RuntimeException ex) {
       return ProviderResultMapper.error(Provider.CLAUDE, ex.getMessage(), elapsedMs(start));
     }
+  }
+
+  /** The per-comparison model choice (FR-020), or this adapter's configured default. */
+  private String requestedModel(PromptRequest request) {
+    return request.model() != null ? request.model() : model;
   }
 
   private static long elapsedMs(long startNanos) {

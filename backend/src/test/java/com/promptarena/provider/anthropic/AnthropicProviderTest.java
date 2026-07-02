@@ -2,7 +2,12 @@ package com.promptarena.provider.anthropic;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.anyUrl;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.options;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -205,5 +210,52 @@ class AnthropicProviderTest {
 
     assertThat(response.outcome()).isEqualTo(Outcome.ERROR);
     assertThat(response.errorMessage()).isEqualTo("provider_not_configured");
+  }
+
+  @Test
+  void streamRequestsTheOverrideModelInsteadOfTheConfiguredOne() {
+    stubMessagesStream("Hello");
+
+    ProviderResponse response =
+        provider("test-key").stream(new PromptRequest("hi", "claude-override"), token -> {});
+
+    assertThat(response.outcome()).isEqualTo(Outcome.SUCCESS);
+    server.verify(
+        postRequestedFor(anyUrl())
+            .withRequestBody(matchingJsonPath("$.model", equalTo("claude-override"))));
+  }
+
+  /** Mirrors the live {@code GET /v1/models} shape — every returned id is a chat model. */
+  @Test
+  void listModelsReturnsEveryReportedId() {
+    server.stubFor(
+        get(urlPathEqualTo("/v1/models"))
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
+                        {"data":[
+                          {"type":"model","id":"claude-sonnet-4-5",
+                           "display_name":"Claude Sonnet 4.5","created_at":"2025-09-29T00:00:00Z"},
+                          {"type":"model","id":"claude-3-5-haiku-20241022",
+                           "display_name":"Claude Haiku 3.5","created_at":"2024-10-22T00:00:00Z"}
+                        ],"has_more":false,
+                        "first_id":"claude-sonnet-4-5","last_id":"claude-3-5-haiku-20241022"}
+                        """)));
+
+    assertThat(provider("test-key").listModels())
+        .containsExactly("claude-sonnet-4-5", "claude-3-5-haiku-20241022");
+  }
+
+  @Test
+  void listModelsIsEmptyWhenUnconfigured() {
+    assertThat(provider(null).listModels()).isEmpty();
+  }
+
+  @Test
+  void defaultModelIsTheConfiguredModel() {
+    assertThat(provider("test-key").defaultModel()).isEqualTo("claude-test");
   }
 }

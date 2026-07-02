@@ -1,6 +1,7 @@
 package com.promptarena.comparison;
 
 import com.promptarena.auth.CurrentUserService;
+import com.promptarena.catalog.ModelCatalogService;
 import com.promptarena.dto.ChunkEvent;
 import com.promptarena.dto.ComparisonDetailResponse;
 import com.promptarena.dto.ComparisonListResponse;
@@ -8,6 +9,7 @@ import com.promptarena.dto.ComparisonSummary;
 import com.promptarena.dto.CreateComparisonRequest;
 import com.promptarena.dto.CreateComparisonResponse;
 import com.promptarena.dto.DoneEvent;
+import com.promptarena.dto.ProviderCatalogEntry;
 import com.promptarena.dto.ResultEvent;
 import com.promptarena.model.Comparison;
 import com.promptarena.model.Provider;
@@ -18,7 +20,10 @@ import com.promptarena.repository.ComparisonRepository;
 import com.promptarena.web.NotFoundException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -50,6 +55,7 @@ public class ComparisonController {
   private final ComparisonService comparisonService;
   private final CurrentUserService currentUser;
   private final ComparisonRepository comparisons;
+  private final ModelCatalogService modelCatalog;
   private final Executor streamExecutor;
   private final int maxPromptLen;
 
@@ -57,25 +63,37 @@ public class ComparisonController {
       ComparisonService comparisonService,
       CurrentUserService currentUser,
       ComparisonRepository comparisons,
+      ModelCatalogService modelCatalog,
       @Qualifier("providerExecutor") Executor streamExecutor,
       @Value("${prompt-arena.max-prompt-len:8000}") int maxPromptLen) {
     this.comparisonService = comparisonService;
     this.currentUser = currentUser;
     this.comparisons = comparisons;
+    this.modelCatalog = modelCatalog;
     this.streamExecutor = streamExecutor;
     this.maxPromptLen = maxPromptLen;
   }
 
   /**
    * Validate, persist a {@code PENDING} comparison owned by the caller, return its id (FR-004/5/6).
+   * The model each selected provider will run is resolved now — the explicit choice or the
+   * provider's current default — and persisted with the comparison (FR-020).
    */
   @PostMapping
   public ResponseEntity<CreateComparisonResponse> create(
       @RequestBody CreateComparisonRequest body) {
     List<Provider> providers =
         ComparisonValidator.validate(body.prompt(), body.providers(), maxPromptLen);
+    Map<Provider, ProviderCatalogEntry> catalog = modelCatalog.catalogFor(providers);
+    Map<Provider, String> models =
+        ComparisonValidator.resolveModels(
+            body.models(),
+            providers,
+            provider -> Set.copyOf(catalog.get(provider).models()),
+            provider -> catalog.get(provider).defaultModel());
     User user = currentUser.require();
-    Comparison comparison = comparisons.save(new Comparison(user, body.prompt(), providers));
+    Comparison comparison =
+        comparisons.save(new Comparison(user, body.prompt(), providers, models));
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(new CreateComparisonResponse(comparison.getId(), providers));
   }
@@ -108,8 +126,12 @@ public class ComparisonController {
     Comparison comparison = loadOwned(id);
     List<ResultEvent> results =
         comparison.getResults().stream().map(ComparisonController::toEvent).toList();
+    // Copied out of the entity so serialization never touches a JPA collection; empty for
+    // comparisons persisted before model selection existed (FR-020).
+    Map<Provider, String> models = new EnumMap<>(Provider.class);
+    models.putAll(comparison.getModels());
     return new ComparisonDetailResponse(
-        comparison.getId(), comparison.getPrompt(), comparison.getCreatedAt(), results);
+        comparison.getId(), comparison.getPrompt(), comparison.getCreatedAt(), models, results);
   }
 
   /**

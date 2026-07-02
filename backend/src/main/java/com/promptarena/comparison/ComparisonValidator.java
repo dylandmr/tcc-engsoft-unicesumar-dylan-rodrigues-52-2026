@@ -3,13 +3,17 @@ package com.promptarena.comparison;
 import com.promptarena.model.Provider;
 import com.promptarena.web.ValidationException;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * Validates a comparison request and parses provider names, mapping each failure to the
- * machine-readable error code of the REST contract (FR-005, FR-006). Pure logic, no Spring.
+ * machine-readable error code of the REST contract (FR-005, FR-006, FR-020). Pure logic, no Spring
+ * — the per-provider allowed-model sets and defaults are passed in by the caller.
  */
 final class ComparisonValidator {
 
@@ -53,5 +57,52 @@ final class ComparisonValidator {
     } catch (IllegalArgumentException | NullPointerException ex) {
       throw new ValidationException("unknown_provider");
     }
+  }
+
+  /**
+   * Validate the optional per-provider model choices and resolve the model each selected provider
+   * will run: the explicit choice when one was made, otherwise that provider's default (FR-020). A
+   * choice for a provider that is not selected (or not a provider at all) fails with {@code
+   * model_for_unselected_provider}; a choice outside the provider's offered set fails with {@code
+   * unknown_model}. A {@code null} default leaves that provider unresolved (adapter falls back).
+   */
+  static Map<Provider, String> resolveModels(
+      Map<String, String> requestedModels,
+      List<Provider> selectedProviders,
+      Function<Provider, Set<String>> allowedModels,
+      Function<Provider, String> defaultModels) {
+    Map<Provider, String> explicit = new EnumMap<>(Provider.class);
+    if (requestedModels != null) {
+      for (Map.Entry<String, String> choice : requestedModels.entrySet()) {
+        Provider provider = parseSelected(choice.getKey(), selectedProviders);
+        String model = choice.getValue();
+        if (model == null || model.isBlank() || !allowedModels.apply(provider).contains(model)) {
+          throw new ValidationException("unknown_model");
+        }
+        explicit.put(provider, model);
+      }
+    }
+    Map<Provider, String> resolved = new EnumMap<>(Provider.class);
+    for (Provider provider : selectedProviders) {
+      String model =
+          explicit.containsKey(provider) ? explicit.get(provider) : defaultModels.apply(provider);
+      if (model != null) {
+        resolved.put(provider, model);
+      }
+    }
+    return resolved;
+  }
+
+  private static Provider parseSelected(String name, List<Provider> selectedProviders) {
+    Provider provider;
+    try {
+      provider = Provider.valueOf(name);
+    } catch (IllegalArgumentException | NullPointerException ex) {
+      throw new ValidationException("model_for_unselected_provider");
+    }
+    if (!selectedProviders.contains(provider)) {
+      throw new ValidationException("model_for_unselected_provider");
+    }
+    return provider;
   }
 }

@@ -1,10 +1,12 @@
 package com.promptarena.config;
 
+import com.promptarena.dto.ProviderDescriptor;
 import com.promptarena.model.Provider;
 import com.promptarena.provider.LlmProvider;
 import com.promptarena.provider.anthropic.AnthropicProvider;
 import com.promptarena.provider.google.GeminiProvider;
 import com.promptarena.provider.openai.OpenAiCompatibleProvider;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -76,5 +78,45 @@ public class ProviderConfig {
         apiKey,
         modelOrDefault(model, GeminiProvider.DEFAULT_MODEL),
         GeminiProvider.DEFAULT_BASE_URL);
+  }
+
+  /**
+   * One descriptor per provider for the model catalog (FR-020), resolved with the same
+   * env-override-or-constant rule (and blank-string gotcha) as the adapters above — so the default
+   * model is correct even for unconfigured providers, whose adapter would report nothing.
+   */
+  @Bean
+  List<ProviderDescriptor> providerDescriptors(
+      @Value("${GOOGLE_API_KEY:}") String googleKey,
+      @Value("${GOOGLE_MODEL:}") String googleModel,
+      @Value("${OPENAI_API_KEY:}") String openaiKey,
+      @Value("${OPENAI_MODEL:}") String openaiModel,
+      @Value("${ANTHROPIC_API_KEY:}") String anthropicKey,
+      @Value("${ANTHROPIC_MODEL:}") String anthropicModel,
+      @Value("${XAI_API_KEY:}") String xaiKey,
+      @Value("${XAI_MODEL:}") String xaiModel,
+      @Value("${DEEPSEEK_API_KEY:}") String deepseekKey,
+      @Value("${DEEPSEEK_MODEL:}") String deepseekModel) {
+    return List.of(
+        new ProviderDescriptor(
+            Provider.GEMINI,
+            StringUtils.hasText(googleKey),
+            modelOrDefault(googleModel, GeminiProvider.DEFAULT_MODEL)),
+        new ProviderDescriptor(
+            Provider.CHATGPT,
+            StringUtils.hasText(openaiKey),
+            modelOrDefault(openaiModel, OpenAiCompatibleProvider.DEFAULT_CHATGPT_MODEL)),
+        new ProviderDescriptor(
+            Provider.CLAUDE,
+            StringUtils.hasText(anthropicKey),
+            modelOrDefault(anthropicModel, AnthropicProvider.DEFAULT_MODEL)),
+        new ProviderDescriptor(
+            Provider.GROK,
+            StringUtils.hasText(xaiKey),
+            modelOrDefault(xaiModel, OpenAiCompatibleProvider.DEFAULT_GROK_MODEL)),
+        new ProviderDescriptor(
+            Provider.DEEPSEEK,
+            StringUtils.hasText(deepseekKey),
+            modelOrDefault(deepseekModel, OpenAiCompatibleProvider.DEFAULT_DEEPSEEK_MODEL)));
   }
 }

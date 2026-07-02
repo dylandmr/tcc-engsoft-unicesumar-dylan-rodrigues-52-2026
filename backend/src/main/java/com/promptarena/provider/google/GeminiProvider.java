@@ -7,6 +7,8 @@ import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.GenerateContentResponse;
 import com.google.genai.types.HttpOptions;
 import com.google.genai.types.HttpRetryOptions;
+import com.google.genai.types.ListModelsConfig;
+import com.google.genai.types.Model;
 import com.google.genai.types.ThinkingConfig;
 import com.promptarena.dto.PromptRequest;
 import com.promptarena.dto.ProviderResponse;
@@ -15,6 +17,7 @@ import com.promptarena.model.Provider;
 import com.promptarena.provider.LlmProvider;
 import com.promptarena.provider.ProviderResultMapper;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
@@ -66,6 +69,36 @@ public final class GeminiProvider implements LlmProvider {
   }
 
   @Override
+  public String defaultModel() {
+    return model;
+  }
+
+  /**
+   * The chat-capable models Gemini's own API reports (FR-020). The SDK reads the wire field {@code
+   * supportedGenerationMethods} into {@code supportedActions} (javap-verified against google-genai
+   * 1.60.0's {@code listModelsResponseFromMldev}); only models that can {@code generateContent}
+   * qualify. May throw on an API failure — the model catalog isolates the fetch.
+   */
+  @Override
+  public List<String> listModels() {
+    if (client == null) {
+      return List.of();
+    }
+    List<String> ids = new ArrayList<>();
+    for (Model entry : client.models.list(ListModelsConfig.builder().build())) {
+      if (entry.supportedActions().orElse(List.of()).contains("generateContent")) {
+        entry.name().map(GeminiProvider::stripModelsPrefix).ifPresent(ids::add);
+      }
+    }
+    return ids;
+  }
+
+  /** The wire name is {@code models/<id>}; the catalog and the SPA use the bare id. */
+  private static String stripModelsPrefix(String name) {
+    return name.startsWith("models/") ? name.substring("models/".length()) : name;
+  }
+
+  @Override
   public ProviderResponse stream(PromptRequest request, Consumer<String> onToken) {
     if (client == null) {
       return ProviderResultMapper.error(Provider.GEMINI, "provider_not_configured", null);
@@ -82,7 +115,8 @@ public final class GeminiProvider implements LlmProvider {
       StringBuilder full = new StringBuilder();
       boolean completed = false;
       try (ResponseStream<GenerateContentResponse> chunks =
-          client.models.generateContentStream(model, request.prompt(), STREAM_CONFIG)) {
+          client.models.generateContentStream(
+              requestedModel(request), request.prompt(), STREAM_CONFIG)) {
         for (GenerateContentResponse chunk : chunks) {
           Optional.ofNullable(chunk.text())
               .ifPresent(
@@ -119,6 +153,11 @@ public final class GeminiProvider implements LlmProvider {
     } catch (RuntimeException ex) {
       return ProviderResultMapper.error(Provider.GEMINI, ex.getMessage(), elapsedMs(start));
     }
+  }
+
+  /** The per-comparison model choice (FR-020), or this adapter's configured default. */
+  private String requestedModel(PromptRequest request) {
+    return request.model() != null ? request.model() : model;
   }
 
   /** Whether any candidate on this chunk carries a finish reason (a definitive end-of-stream). */

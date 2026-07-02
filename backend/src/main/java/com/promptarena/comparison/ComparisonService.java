@@ -11,6 +11,7 @@ import com.promptarena.provider.ProviderRegistry;
 import com.promptarena.provider.ProviderResultMapper;
 import com.promptarena.repository.ComparisonRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -18,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,11 +58,13 @@ public class ComparisonService {
   public int execute(
       String comparisonId, BiConsumer<Provider, String> onToken, Consumer<ResultEvent> onResult) {
     Comparison comparison = load(comparisonId);
-    PromptRequest request = new PromptRequest(comparison.getPrompt());
+    // Each provider runs the model persisted at POST time (FR-020); providers with no entry
+    // (comparisons that predate model selection) get null and fall back to the adapter default.
+    Map<Provider, String> models = comparison.getModels();
     List<ProviderResponse> responses =
         fanOut(
             comparison.getProviders(),
-            request,
+            provider -> new PromptRequest(comparison.getPrompt(), models.get(provider)),
             onToken,
             response -> onResult.accept(toEvent(response)));
     for (ProviderResponse response : responses) {
@@ -102,16 +106,19 @@ public class ComparisonService {
   }
 
   /**
-   * Fan out the prompt to every provider concurrently, isolating each. {@code onResult} fires once
+   * Fan out the prompt to every provider concurrently, isolating each. {@code requestFor} builds
+   * each provider's request (same prompt, per-provider model — FR-020). {@code onResult} fires once
    * per provider as it completes; the returned list is the aggregated set once all have reported.
    */
   List<ProviderResponse> fanOut(
       List<Provider> providers,
-      PromptRequest request,
+      Function<Provider, PromptRequest> requestFor,
       BiConsumer<Provider, String> onToken,
       Consumer<ProviderResponse> onResult) {
     List<CompletableFuture<ProviderResponse>> futures =
-        providers.stream().map(provider -> dispatch(provider, request, onToken, onResult)).toList();
+        providers.stream()
+            .map(provider -> dispatch(provider, requestFor.apply(provider), onToken, onResult))
+            .toList();
     return futures.stream().map(CompletableFuture::join).toList();
   }
 

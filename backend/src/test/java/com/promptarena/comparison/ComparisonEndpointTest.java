@@ -1,5 +1,7 @@
 package com.promptarena.comparison;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.anEmptyMap;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -17,19 +19,38 @@ import com.promptarena.model.User;
 import com.promptarena.repository.ComparisonRepository;
 import com.promptarena.repository.UserRepository;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
 
-/** End-to-end MockMvc tests for the comparison endpoints (session auth as the seeded demo user). */
+/**
+ * End-to-end MockMvc tests for the comparison endpoints (session auth as the seeded demo user).
+ * Provider keys are forced blank (test properties outrank real environment variables) so the model
+ * catalog consulted by {@code POST} is fully curated — deterministic and offline.
+ */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
+@TestPropertySource(
+    properties = {
+      "GOOGLE_API_KEY=",
+      "OPENAI_API_KEY=",
+      "ANTHROPIC_API_KEY=",
+      "XAI_API_KEY=",
+      "DEEPSEEK_API_KEY=",
+      "GOOGLE_MODEL=",
+      "OPENAI_MODEL=",
+      "ANTHROPIC_MODEL=",
+      "XAI_MODEL=",
+      "DEEPSEEK_MODEL="
+    })
 class ComparisonEndpointTest {
 
   @Autowired private MockMvc mockMvc;
@@ -149,6 +170,67 @@ class ComparisonEndpointTest {
   }
 
   @Test
+  void modelForUnselectedProviderIsRejected() throws Exception {
+    mockMvc
+        .perform(
+            authedPost(
+                "{\"prompt\":\"hi\",\"providers\":[\"CLAUDE\"],"
+                    + "\"models\":{\"GEMINI\":\"gemini-2.5-pro\"}}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value("model_for_unselected_provider"));
+  }
+
+  @Test
+  void modelForUnknownProviderNameIsRejected() throws Exception {
+    mockMvc
+        .perform(
+            authedPost(
+                "{\"prompt\":\"hi\",\"providers\":[\"CLAUDE\"],\"models\":{\"FOO\":\"bar\"}}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value("model_for_unselected_provider"));
+  }
+
+  @Test
+  void modelOutsideTheProviderCatalogIsRejected() throws Exception {
+    mockMvc
+        .perform(
+            authedPost(
+                "{\"prompt\":\"hi\",\"providers\":[\"CLAUDE\"],"
+                    + "\"models\":{\"CLAUDE\":\"clod-9000\"}}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value("unknown_model"));
+  }
+
+  @Test
+  void explicitModelChoiceIsPersistedAndDefaultsFillTheRest() throws Exception {
+    String response =
+        mockMvc
+            .perform(
+                authedPost(
+                    "{\"prompt\":\"hi\",\"providers\":[\"CLAUDE\",\"GEMINI\"],"
+                        + "\"models\":{\"CLAUDE\":\"claude-haiku-4-5\"}}"))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String id = JsonPath.read(response, "$.comparisonId");
+
+    // The explicit choice and GEMINI's resolved default are persisted with the comparison.
+    Comparison persisted = comparisons.findById(id).orElseThrow();
+    assertThat(persisted.getModels())
+        .isEqualTo(
+            Map.of(
+                Provider.CLAUDE, "claude-haiku-4-5",
+                Provider.GEMINI, "gemini-2.5-flash"));
+
+    mockMvc
+        .perform(get("/api/comparisons/{id}", id).with(user("demo").roles("USER")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.models.CLAUDE").value("claude-haiku-4-5"))
+        .andExpect(jsonPath("$.models.GEMINI").value("gemini-2.5-flash"));
+  }
+
+  @Test
   void detailReflectsRecordedResultsIncludingTelemetry() throws Exception {
     User demo = users.findByUsernameIgnoreCase("demo").orElseThrow();
     Comparison comparison = new Comparison(demo, "saved prompt", List.of(Provider.CLAUDE));
@@ -171,6 +253,8 @@ class ComparisonEndpointTest {
     mockMvc
         .perform(get("/api/comparisons/{id}", id).with(user("demo").roles("USER")))
         .andExpect(status().isOk())
+        // A comparison persisted before model selection existed reports an empty models map.
+        .andExpect(jsonPath("$.models", anEmptyMap()))
         .andExpect(jsonPath("$.results[0].provider").value("CLAUDE"))
         .andExpect(jsonPath("$.results[0].outcome").value("SUCCESS"))
         .andExpect(jsonPath("$.results[0].responseText").value("the answer"))
