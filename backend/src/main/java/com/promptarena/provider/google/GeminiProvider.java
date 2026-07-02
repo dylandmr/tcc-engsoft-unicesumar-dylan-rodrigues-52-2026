@@ -30,9 +30,6 @@ import java.util.function.Consumer;
  */
 public final class GeminiProvider implements LlmProvider {
 
-  // gemini-2.5-flash is the current default because the free tier for gemini-2.0-flash now grants
-  // zero requests on new keys (429 "limit: 0"); 2.5-flash works on the free tier.
-  public static final String DEFAULT_MODEL = "gemini-2.5-flash";
   public static final String DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com";
 
   // Gemini 2.5 models "think" (reason silently) before emitting output, which on longer prompts
@@ -45,11 +42,9 @@ public final class GeminiProvider implements LlmProvider {
           .thinkingConfig(ThinkingConfig.builder().thinkingBudget(0))
           .build();
 
-  private final String model;
   private final Client client;
 
-  public GeminiProvider(String apiKey, String model, String baseUrl) {
-    this.model = model;
+  public GeminiProvider(String apiKey, String baseUrl) {
     this.client =
         (apiKey == null || apiKey.isBlank())
             ? null
@@ -66,11 +61,6 @@ public final class GeminiProvider implements LlmProvider {
   @Override
   public Provider id() {
     return Provider.GEMINI;
-  }
-
-  @Override
-  public String defaultModel() {
-    return model;
   }
 
   /**
@@ -115,8 +105,7 @@ public final class GeminiProvider implements LlmProvider {
       StringBuilder full = new StringBuilder();
       boolean completed = false;
       try (ResponseStream<GenerateContentResponse> chunks =
-          client.models.generateContentStream(
-              requestedModel(request), request.prompt(), STREAM_CONFIG)) {
+          client.models.generateContentStream(request.model(), request.prompt(), STREAM_CONFIG)) {
         for (GenerateContentResponse chunk : chunks) {
           Optional.ofNullable(chunk.text())
               .ifPresent(
@@ -153,11 +142,6 @@ public final class GeminiProvider implements LlmProvider {
     } catch (RuntimeException ex) {
       return ProviderResultMapper.error(Provider.GEMINI, ex.getMessage(), elapsedMs(start));
     }
-  }
-
-  /** The per-comparison model choice (FR-020), or this adapter's configured default. */
-  private String requestedModel(PromptRequest request) {
-    return request.model() != null ? request.model() : model;
   }
 
   /** Whether any candidate on this chunk carries a finish reason (a definitive end-of-stream). */

@@ -13,49 +13,77 @@ import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link ComparisonValidator#resolveModels} (FR-020) — the pure model-choice
- * validation/resolution logic. Endpoint-level behavior (HTTP codes, catalog wiring) is covered by
- * {@code ComparisonEndpointTest}; prompt/provider validation by its existing endpoint tests.
+ * Unit tests for {@link ComparisonValidator#requireModels} (FR-020) — the pure model-choice
+ * validation logic. There are no defaults: every selected provider MUST carry an explicit,
+ * catalog-backed model. Endpoint-level behavior (HTTP codes, catalog wiring) is covered by {@code
+ * ComparisonEndpointTest}; prompt/provider validation by its existing endpoint tests.
  */
 class ComparisonValidatorTest {
 
   private static final List<Provider> SELECTED = List.of(Provider.CLAUDE, Provider.GEMINI);
   private static final Function<Provider, Set<String>> ALLOWED =
       provider -> Set.of("allowed-model", "other-allowed-model");
-  private static final Function<Provider, String> DEFAULTS =
-      provider -> "default-" + provider.name();
 
   @Test
-  void nullModelsMapResolvesEveryProviderToItsDefault() {
-    Map<Provider, String> resolved =
-        ComparisonValidator.resolveModels(null, SELECTED, ALLOWED, DEFAULTS);
+  void fullValidMapIsReturnedKeyedByProvider() {
+    Map<Provider, String> models =
+        ComparisonValidator.requireModels(
+            Map.of("CLAUDE", "allowed-model", "GEMINI", "other-allowed-model"), SELECTED, ALLOWED);
 
-    assertThat(resolved)
-        .isEqualTo(
-            Map.of(
-                Provider.CLAUDE, "default-CLAUDE",
-                Provider.GEMINI, "default-GEMINI"));
-  }
-
-  @Test
-  void explicitChoiceWinsAndDefaultsFillTheRest() {
-    Map<Provider, String> resolved =
-        ComparisonValidator.resolveModels(
-            Map.of("CLAUDE", "allowed-model"), SELECTED, ALLOWED, DEFAULTS);
-
-    assertThat(resolved)
+    assertThat(models)
         .isEqualTo(
             Map.of(
                 Provider.CLAUDE, "allowed-model",
-                Provider.GEMINI, "default-GEMINI"));
+                Provider.GEMINI, "other-allowed-model"));
+  }
+
+  @Test
+  void absentModelsMapIsRejected() {
+    assertThatThrownBy(() -> ComparisonValidator.requireModels(null, SELECTED, ALLOWED))
+        .isInstanceOf(ValidationException.class)
+        .extracting("code")
+        .isEqualTo("missing_model");
+  }
+
+  @Test
+  void partialModelsMapIsRejected() {
+    assertThatThrownBy(
+            () ->
+                ComparisonValidator.requireModels(
+                    Map.of("CLAUDE", "allowed-model"), SELECTED, ALLOWED))
+        .isInstanceOf(ValidationException.class)
+        .extracting("code")
+        .isEqualTo("missing_model");
+  }
+
+  @Test
+  void nullModelValueIsRejected() {
+    assertThatThrownBy(
+            () ->
+                ComparisonValidator.requireModels(
+                    Collections.singletonMap("CLAUDE", null), SELECTED, ALLOWED))
+        .isInstanceOf(ValidationException.class)
+        .extracting("code")
+        .isEqualTo("missing_model");
+  }
+
+  @Test
+  void blankModelValueIsRejected() {
+    assertThatThrownBy(
+            () ->
+                ComparisonValidator.requireModels(
+                    Map.of("CLAUDE", "   ", "GEMINI", "allowed-model"), SELECTED, ALLOWED))
+        .isInstanceOf(ValidationException.class)
+        .extracting("code")
+        .isEqualTo("missing_model");
   }
 
   @Test
   void unknownProviderNameKeyIsRejected() {
     assertThatThrownBy(
             () ->
-                ComparisonValidator.resolveModels(
-                    Map.of("FOO", "allowed-model"), SELECTED, ALLOWED, DEFAULTS))
+                ComparisonValidator.requireModels(
+                    Map.of("FOO", "allowed-model"), SELECTED, ALLOWED))
         .isInstanceOf(ValidationException.class)
         .extracting("code")
         .isEqualTo("model_for_unselected_provider");
@@ -65,8 +93,8 @@ class ComparisonValidatorTest {
   void nullProviderKeyIsRejected() {
     assertThatThrownBy(
             () ->
-                ComparisonValidator.resolveModels(
-                    Collections.singletonMap(null, "allowed-model"), SELECTED, ALLOWED, DEFAULTS))
+                ComparisonValidator.requireModels(
+                    Collections.singletonMap(null, "allowed-model"), SELECTED, ALLOWED))
         .isInstanceOf(ValidationException.class)
         .extracting("code")
         .isEqualTo("model_for_unselected_provider");
@@ -76,51 +104,35 @@ class ComparisonValidatorTest {
   void keyOutsideTheSelectedProvidersIsRejected() {
     assertThatThrownBy(
             () ->
-                ComparisonValidator.resolveModels(
-                    Map.of("GROK", "allowed-model"), SELECTED, ALLOWED, DEFAULTS))
+                ComparisonValidator.requireModels(
+                    Map.of("GROK", "allowed-model"), SELECTED, ALLOWED))
         .isInstanceOf(ValidationException.class)
         .extracting("code")
         .isEqualTo("model_for_unselected_provider");
   }
 
   @Test
-  void nullModelValueIsRejected() {
-    assertThatThrownBy(
-            () ->
-                ComparisonValidator.resolveModels(
-                    Collections.singletonMap("CLAUDE", null), SELECTED, ALLOWED, DEFAULTS))
-        .isInstanceOf(ValidationException.class)
-        .extracting("code")
-        .isEqualTo("unknown_model");
-  }
-
-  @Test
-  void blankModelValueIsRejected() {
-    assertThatThrownBy(
-            () ->
-                ComparisonValidator.resolveModels(
-                    Map.of("CLAUDE", "   "), SELECTED, ALLOWED, DEFAULTS))
-        .isInstanceOf(ValidationException.class)
-        .extracting("code")
-        .isEqualTo("unknown_model");
-  }
-
-  @Test
   void modelOutsideTheAllowedSetIsRejected() {
     assertThatThrownBy(
             () ->
-                ComparisonValidator.resolveModels(
-                    Map.of("CLAUDE", "clod-9000"), SELECTED, ALLOWED, DEFAULTS))
+                ComparisonValidator.requireModels(
+                    Map.of("CLAUDE", "clod-9000", "GEMINI", "allowed-model"), SELECTED, ALLOWED))
         .isInstanceOf(ValidationException.class)
         .extracting("code")
         .isEqualTo("unknown_model");
   }
 
+  /** With a live-only catalog, an unconfigured provider's allowed set is empty — never valid. */
   @Test
-  void nullDefaultLeavesTheProviderUnresolved() {
-    Map<Provider, String> resolved =
-        ComparisonValidator.resolveModels(null, SELECTED, ALLOWED, provider -> null);
-
-    assertThat(resolved).isEmpty();
+  void anyChoiceForAProviderWithAnEmptyCatalogIsRejected() {
+    assertThatThrownBy(
+            () ->
+                ComparisonValidator.requireModels(
+                    Map.of("CLAUDE", "allowed-model", "GEMINI", "allowed-model"),
+                    SELECTED,
+                    provider -> provider == Provider.GEMINI ? Set.of() : Set.of("allowed-model")))
+        .isInstanceOf(ValidationException.class)
+        .extracting("code")
+        .isEqualTo("unknown_model");
   }
 }

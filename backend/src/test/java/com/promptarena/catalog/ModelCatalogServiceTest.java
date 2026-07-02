@@ -32,9 +32,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Unit tests for the model catalog (FR-020): curated∪live∪default union, per-provider isolation of
- * live-fetch failures, and the TTL cache — expiry is driven by a mutable {@link Clock}, never by
- * sleeping.
+ * Unit tests for the model catalog (FR-020): live-only lists (sorted, deduplicated — no curated or
+ * default models anywhere), per-provider isolation of live-fetch failures, and the TTL cache —
+ * expiry is driven by a mutable {@link Clock}, never by sleeping.
  */
 @ExtendWith(MockitoExtension.class)
 class ModelCatalogServiceTest {
@@ -68,11 +68,11 @@ class ModelCatalogServiceTest {
 
   private static ProviderDescriptor[] allUnconfigured() {
     return new ProviderDescriptor[] {
-      new ProviderDescriptor(Provider.GEMINI, false, "gemini-2.5-flash"),
-      new ProviderDescriptor(Provider.CHATGPT, false, "gpt-4o-mini"),
-      new ProviderDescriptor(Provider.CLAUDE, false, "claude-3-5-sonnet-latest"),
-      new ProviderDescriptor(Provider.GROK, false, "grok-2-latest"),
-      new ProviderDescriptor(Provider.DEEPSEEK, false, "deepseek-chat")
+      new ProviderDescriptor(Provider.GEMINI, false),
+      new ProviderDescriptor(Provider.CHATGPT, false),
+      new ProviderDescriptor(Provider.CLAUDE, false),
+      new ProviderDescriptor(Provider.GROK, false),
+      new ProviderDescriptor(Provider.DEEPSEEK, false)
     };
   }
 
@@ -108,74 +108,41 @@ class ModelCatalogServiceTest {
         .extracting(ProviderCatalogEntry::provider)
         .containsExactly(
             Provider.GEMINI, Provider.CHATGPT, Provider.CLAUDE, Provider.GROK, Provider.DEEPSEEK);
-    assertThat(catalog).extracting(ProviderCatalogEntry::source).containsOnly("curated");
     assertThat(catalog).extracting(ProviderCatalogEntry::configured).containsOnly(false);
+    assertThat(catalog).allSatisfy(entry -> assertThat(entry.models()).isEmpty());
   }
 
   @Test
-  void unconfiguredProviderGetsTheSortedCuratedListAndNeverFetches() {
+  void unconfiguredProviderHasAnEmptyCatalogAndNeverFetches() {
     Map<Provider, ProviderCatalogEntry> catalog =
         service(allUnconfigured()).catalogFor(List.of(Provider.GEMINI));
 
     ProviderCatalogEntry gemini = catalog.get(Provider.GEMINI);
-    assertThat(gemini.models())
-        .containsExactly(
-            "gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro");
-    assertThat(gemini.defaultModel()).isEqualTo("gemini-2.5-flash");
-    assertThat(gemini.source()).isEqualTo("curated");
+    assertThat(gemini.models()).isEmpty();
+    assertThat(gemini.configured()).isFalse();
     verifyNoInteractions(registry);
   }
 
   @Test
-  void modelsAreTheSortedDedupedUnionOfCuratedLiveAndDefault() {
+  void modelsAreTheSortedDedupedLiveList() {
     AtomicInteger calls = new AtomicInteger();
-    // The live list overlaps curated (dupe), repeats itself (dupe) and adds a new id.
+    // The live list arrives unsorted and with a duplicate.
     registerListing(
         Provider.GEMINI,
-        () -> List.of("zzz-live-model", "gemini-2.5-flash", "zzz-live-model"),
+        () -> List.of("gemini-2.5-pro", "gemini-2.0-flash", "gemini-2.5-pro", "gemini-2.5-flash"),
         calls);
-    ModelCatalogService service =
-        service(new ProviderDescriptor(Provider.GEMINI, true, "custom-default-model"));
+    ModelCatalogService service = service(new ProviderDescriptor(Provider.GEMINI, true));
 
     ProviderCatalogEntry gemini = service.catalogFor(List.of(Provider.GEMINI)).get(Provider.GEMINI);
 
     assertThat(gemini.models())
-        .containsExactly(
-            "custom-default-model",
-            "gemini-2.0-flash",
-            "gemini-2.5-flash",
-            "gemini-2.5-flash-lite",
-            "gemini-2.5-pro",
-            "zzz-live-model");
-    assertThat(gemini.defaultModel()).isEqualTo("custom-default-model");
-    assertThat(gemini.source()).isEqualTo("live");
+        .containsExactly("gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.5-pro");
     assertThat(gemini.configured()).isTrue();
+    assertThat(calls.get()).isEqualTo(1);
   }
 
   @Test
-  void defaultModelIsAlwaysOfferedEvenWhenUnconfigured() {
-    ProviderCatalogEntry grok =
-        service(new ProviderDescriptor(Provider.GROK, false, "grok-env-override"))
-            .catalogFor(List.of(Provider.GROK))
-            .get(Provider.GROK);
-
-    assertThat(grok.models()).contains("grok-env-override");
-    assertThat(grok.source()).isEqualTo("curated");
-  }
-
-  @Test
-  void nullDefaultModelYieldsTheCuratedListAlone() {
-    ProviderCatalogEntry deepseek =
-        service(new ProviderDescriptor(Provider.DEEPSEEK, false, null))
-            .catalogFor(List.of(Provider.DEEPSEEK))
-            .get(Provider.DEEPSEEK);
-
-    assertThat(deepseek.defaultModel()).isNull();
-    assertThat(deepseek.models()).containsExactly("deepseek-chat", "deepseek-reasoner");
-  }
-
-  @Test
-  void liveFetchFailureDegradesToCurated() {
+  void liveFetchFailureYieldsAnEmptyCatalog() {
     AtomicInteger calls = new AtomicInteger();
     registerListing(
         Provider.CLAUDE,
@@ -185,36 +152,31 @@ class ModelCatalogServiceTest {
         calls);
 
     ProviderCatalogEntry claude =
-        service(new ProviderDescriptor(Provider.CLAUDE, true, "claude-3-5-sonnet-latest"))
+        service(new ProviderDescriptor(Provider.CLAUDE, true))
             .catalogFor(List.of(Provider.CLAUDE))
             .get(Provider.CLAUDE);
 
-    assertThat(claude.source()).isEqualTo("curated");
-    assertThat(claude.models())
-        .containsExactly(
-            "claude-3-5-haiku-latest",
-            "claude-3-5-sonnet-latest",
-            "claude-haiku-4-5",
-            "claude-opus-4-1",
-            "claude-sonnet-4-5");
-  }
-
-  @Test
-  void emptyLiveListKeepsSourceCurated() {
-    AtomicInteger calls = new AtomicInteger();
-    registerListing(Provider.CHATGPT, List::of, calls);
-
-    ProviderCatalogEntry chatgpt =
-        service(new ProviderDescriptor(Provider.CHATGPT, true, "gpt-4o-mini"))
-            .catalogFor(List.of(Provider.CHATGPT))
-            .get(Provider.CHATGPT);
-
-    assertThat(chatgpt.source()).isEqualTo("curated");
+    assertThat(claude.models()).isEmpty();
+    assertThat(claude.configured()).isTrue();
     assertThat(calls.get()).isEqualTo(1);
   }
 
   @Test
-  void slowFetchTimesOutAndDegradesToCurated() throws Exception {
+  void emptyLiveListYieldsAnEmptyCatalog() {
+    AtomicInteger calls = new AtomicInteger();
+    registerListing(Provider.CHATGPT, List::of, calls);
+
+    ProviderCatalogEntry chatgpt =
+        service(new ProviderDescriptor(Provider.CHATGPT, true))
+            .catalogFor(List.of(Provider.CHATGPT))
+            .get(Provider.CHATGPT);
+
+    assertThat(chatgpt.models()).isEmpty();
+    assertThat(calls.get()).isEqualTo(1);
+  }
+
+  @Test
+  void slowFetchTimesOutAndYieldsAnEmptyCatalog() {
     CountDownLatch release = new CountDownLatch(1);
     AtomicInteger calls = new AtomicInteger();
     registerListing(
@@ -230,12 +192,11 @@ class ModelCatalogServiceTest {
         calls);
     try {
       ProviderCatalogEntry gemini =
-          service(50, new ProviderDescriptor(Provider.GEMINI, true, "gemini-2.5-flash"))
+          service(50, new ProviderDescriptor(Provider.GEMINI, true))
               .catalogFor(List.of(Provider.GEMINI))
               .get(Provider.GEMINI);
 
-      assertThat(gemini.source()).isEqualTo("curated");
-      assertThat(gemini.models()).doesNotContain("too-late-model");
+      assertThat(gemini.models()).isEmpty();
     } finally {
       release.countDown();
     }
@@ -245,23 +206,21 @@ class ModelCatalogServiceTest {
   void catalogIsCachedWithinTheTtl() {
     AtomicInteger calls = new AtomicInteger();
     registerListing(Provider.GEMINI, () -> List.of("live-model"), calls);
-    ModelCatalogService service =
-        service(new ProviderDescriptor(Provider.GEMINI, true, "gemini-2.5-flash"));
+    ModelCatalogService service = service(new ProviderDescriptor(Provider.GEMINI, true));
 
     service.catalogFor(List.of(Provider.GEMINI));
     clock.advanceMillis(TTL_MS - 1);
     ProviderCatalogEntry cached = service.catalogFor(List.of(Provider.GEMINI)).get(Provider.GEMINI);
 
     assertThat(calls.get()).isEqualTo(1);
-    assertThat(cached.models()).contains("live-model");
+    assertThat(cached.models()).containsExactly("live-model");
   }
 
   @Test
   void staleCatalogIsRefetchedAfterTheTtl() {
     AtomicInteger calls = new AtomicInteger();
     registerListing(Provider.GEMINI, () -> List.of("live-model-" + calls.get()), calls);
-    ModelCatalogService service =
-        service(new ProviderDescriptor(Provider.GEMINI, true, "gemini-2.5-flash"));
+    ModelCatalogService service = service(new ProviderDescriptor(Provider.GEMINI, true));
 
     service.catalogFor(List.of(Provider.GEMINI));
     clock.advanceMillis(TTL_MS);
@@ -269,7 +228,7 @@ class ModelCatalogServiceTest {
         service.catalogFor(List.of(Provider.GEMINI)).get(Provider.GEMINI);
 
     assertThat(calls.get()).isEqualTo(2);
-    assertThat(refreshed.models()).contains("live-model-2");
+    assertThat(refreshed.models()).containsExactly("live-model-2");
   }
 
   @Test
@@ -286,13 +245,12 @@ class ModelCatalogServiceTest {
 
     Map<Provider, ProviderCatalogEntry> catalog =
         service(
-                new ProviderDescriptor(Provider.GEMINI, true, "gemini-2.5-flash"),
-                new ProviderDescriptor(Provider.CHATGPT, true, "gpt-4o-mini"))
+                new ProviderDescriptor(Provider.GEMINI, true),
+                new ProviderDescriptor(Provider.CHATGPT, true))
             .catalogFor(List.of(Provider.GEMINI, Provider.CHATGPT));
 
-    assertThat(catalog.get(Provider.GEMINI).source()).isEqualTo("curated");
-    assertThat(catalog.get(Provider.CHATGPT).source()).isEqualTo("live");
-    assertThat(catalog.get(Provider.CHATGPT).models()).contains("gpt-live-model");
+    assertThat(catalog.get(Provider.GEMINI).models()).isEmpty();
+    assertThat(catalog.get(Provider.CHATGPT).models()).containsExactly("gpt-live-model");
   }
 
   @Test

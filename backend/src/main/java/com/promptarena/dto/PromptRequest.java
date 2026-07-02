@@ -2,12 +2,13 @@ package com.promptarena.dto;
 
 /**
  * A prompt to send to a single provider. Uniform across all providers (Constitution II). {@code
- * model} is the per-comparison model choice (FR-020); when {@code null} the adapter falls back to
- * its configured default (pre-feature comparisons persisted no model).
+ * model} is the model chosen for this comparison (FR-020) and is used verbatim on the wire — there
+ * is no default anywhere; the orchestrator never dispatches a provider without one (legacy rows
+ * that persisted no model are guarded with their own ERROR result).
  */
 public record PromptRequest(String prompt, String model) {
 
-  /** A prompt with no explicit model — the adapter's configured default answers. */
+  /** Convenience for tests whose stub adapters never read the model. */
   public PromptRequest(String prompt) {
     this(prompt, null);
   }

@@ -7,8 +7,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * REST endpoint describing every supported provider for the composer (FR-020): whether it is
- * configured, its default model, and the models selectable for it. Protected like every other
- * {@code /api} route — requires an authenticated session (FR-001).
+ * configured and the models selectable for it — exactly what each provider's own API reports.
+ * Protected like every other {@code /api} route — requires an authenticated session (FR-001).
  */
 @RestController
 @RequestMapping("/api/providers")

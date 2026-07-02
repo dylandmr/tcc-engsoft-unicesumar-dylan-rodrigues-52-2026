@@ -13,110 +13,61 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.util.StringUtils;
 
 /**
- * Wires the five {@link LlmProvider} adapters from server-side configuration. API keys and per-
- * provider model ids come from the environment (FR-018); base URLs are fixed per provider. A
- * provider with a blank key builds an "unavailable" adapter whose call yields an {@code ERROR}
- * result, so a missing key never breaks the other providers (FR-010).
- *
- * <p>Model ids fall back to the per-provider default when the env var is <em>unset or blank</em>.
- * The blank case matters because Docker Compose forwards {@code *_MODEL} as an empty string when
- * the key is present-but-empty in {@code .env}, which would otherwise override the {@code @Value}
- * default and send an empty model to the SDK.
+ * Wires the five {@link LlmProvider} adapters from server-side configuration. API keys come from
+ * the environment (FR-018); base URLs are fixed per provider. No model is configured anywhere
+ * (FR-020) — the user chooses one per comparison from the provider's live catalog. A provider with
+ * a blank key builds an "unavailable" adapter whose call yields an {@code ERROR} result, so a
+ * missing key never breaks the other providers (FR-010).
  *
  * <p>Pure wiring (no business logic) — excluded from the coverage gate.
  */
 @Configuration
 public class ProviderConfig {
 
-  private static String modelOrDefault(String configured, String fallback) {
-    return StringUtils.hasText(configured) ? configured : fallback;
-  }
-
   @Bean
-  LlmProvider chatgptProvider(
-      @Value("${OPENAI_API_KEY:}") String apiKey, @Value("${OPENAI_MODEL:}") String model) {
+  LlmProvider chatgptProvider(@Value("${OPENAI_API_KEY:}") String apiKey) {
     return new OpenAiCompatibleProvider(
-        Provider.CHATGPT,
-        apiKey,
-        modelOrDefault(model, OpenAiCompatibleProvider.DEFAULT_CHATGPT_MODEL),
-        OpenAiCompatibleProvider.CHATGPT_BASE_URL);
+        Provider.CHATGPT, apiKey, OpenAiCompatibleProvider.CHATGPT_BASE_URL);
   }
 
   @Bean
-  LlmProvider grokProvider(
-      @Value("${XAI_API_KEY:}") String apiKey, @Value("${XAI_MODEL:}") String model) {
+  LlmProvider grokProvider(@Value("${XAI_API_KEY:}") String apiKey) {
     return new OpenAiCompatibleProvider(
-        Provider.GROK,
-        apiKey,
-        modelOrDefault(model, OpenAiCompatibleProvider.DEFAULT_GROK_MODEL),
-        OpenAiCompatibleProvider.GROK_BASE_URL);
+        Provider.GROK, apiKey, OpenAiCompatibleProvider.GROK_BASE_URL);
   }
 
   @Bean
-  LlmProvider deepseekProvider(
-      @Value("${DEEPSEEK_API_KEY:}") String apiKey, @Value("${DEEPSEEK_MODEL:}") String model) {
+  LlmProvider deepseekProvider(@Value("${DEEPSEEK_API_KEY:}") String apiKey) {
     return new OpenAiCompatibleProvider(
-        Provider.DEEPSEEK,
-        apiKey,
-        modelOrDefault(model, OpenAiCompatibleProvider.DEFAULT_DEEPSEEK_MODEL),
-        OpenAiCompatibleProvider.DEEPSEEK_BASE_URL);
+        Provider.DEEPSEEK, apiKey, OpenAiCompatibleProvider.DEEPSEEK_BASE_URL);
   }
 
   @Bean
-  LlmProvider claudeProvider(
-      @Value("${ANTHROPIC_API_KEY:}") String apiKey, @Value("${ANTHROPIC_MODEL:}") String model) {
-    return new AnthropicProvider(
-        apiKey,
-        modelOrDefault(model, AnthropicProvider.DEFAULT_MODEL),
-        AnthropicProvider.DEFAULT_BASE_URL);
+  LlmProvider claudeProvider(@Value("${ANTHROPIC_API_KEY:}") String apiKey) {
+    return new AnthropicProvider(apiKey, AnthropicProvider.DEFAULT_BASE_URL);
   }
 
   @Bean
-  LlmProvider geminiProvider(
-      @Value("${GOOGLE_API_KEY:}") String apiKey, @Value("${GOOGLE_MODEL:}") String model) {
-    return new GeminiProvider(
-        apiKey,
-        modelOrDefault(model, GeminiProvider.DEFAULT_MODEL),
-        GeminiProvider.DEFAULT_BASE_URL);
+  LlmProvider geminiProvider(@Value("${GOOGLE_API_KEY:}") String apiKey) {
+    return new GeminiProvider(apiKey, GeminiProvider.DEFAULT_BASE_URL);
   }
 
   /**
-   * One descriptor per provider for the model catalog (FR-020), resolved with the same
-   * env-override-or-constant rule (and blank-string gotcha) as the adapters above — so the default
-   * model is correct even for unconfigured providers, whose adapter would report nothing.
+   * One descriptor per provider for the model catalog (FR-020): whether a server-side key is
+   * present, resolved once at wiring time next to the adapters above.
    */
   @Bean
   List<ProviderDescriptor> providerDescriptors(
       @Value("${GOOGLE_API_KEY:}") String googleKey,
-      @Value("${GOOGLE_MODEL:}") String googleModel,
       @Value("${OPENAI_API_KEY:}") String openaiKey,
-      @Value("${OPENAI_MODEL:}") String openaiModel,
       @Value("${ANTHROPIC_API_KEY:}") String anthropicKey,
-      @Value("${ANTHROPIC_MODEL:}") String anthropicModel,
       @Value("${XAI_API_KEY:}") String xaiKey,
-      @Value("${XAI_MODEL:}") String xaiModel,
-      @Value("${DEEPSEEK_API_KEY:}") String deepseekKey,
-      @Value("${DEEPSEEK_MODEL:}") String deepseekModel) {
+      @Value("${DEEPSEEK_API_KEY:}") String deepseekKey) {
     return List.of(
-        new ProviderDescriptor(
-            Provider.GEMINI,
-            StringUtils.hasText(googleKey),
-            modelOrDefault(googleModel, GeminiProvider.DEFAULT_MODEL)),
-        new ProviderDescriptor(
-            Provider.CHATGPT,
-            StringUtils.hasText(openaiKey),
-            modelOrDefault(openaiModel, OpenAiCompatibleProvider.DEFAULT_CHATGPT_MODEL)),
-        new ProviderDescriptor(
-            Provider.CLAUDE,
-            StringUtils.hasText(anthropicKey),
-            modelOrDefault(anthropicModel, AnthropicProvider.DEFAULT_MODEL)),
-        new ProviderDescriptor(
-            Provider.GROK,
-            StringUtils.hasText(xaiKey),
-            modelOrDefault(xaiModel, OpenAiCompatibleProvider.DEFAULT_GROK_MODEL)),
-        new ProviderDescriptor(
-            Provider.DEEPSEEK,
-            StringUtils.hasText(deepseekKey),
-            modelOrDefault(deepseekModel, OpenAiCompatibleProvider.DEFAULT_DEEPSEEK_MODEL)));
+        new ProviderDescriptor(Provider.GEMINI, StringUtils.hasText(googleKey)),
+        new ProviderDescriptor(Provider.CHATGPT, StringUtils.hasText(openaiKey)),
+        new ProviderDescriptor(Provider.CLAUDE, StringUtils.hasText(anthropicKey)),
+        new ProviderDescriptor(Provider.GROK, StringUtils.hasText(xaiKey)),
+        new ProviderDescriptor(Provider.DEEPSEEK, StringUtils.hasText(deepseekKey)));
   }
 }

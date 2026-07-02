@@ -32,14 +32,10 @@ public interface LlmProvider {
   /**
    * The chat-capable model ids this provider's own API reports as available (FR-020). Unlike {@link
    * #stream}, implementations MAY throw on an API failure — the model catalog isolates each
-   * provider's fetch and degrades to the curated list. Unconfigured adapters return an empty list.
+   * provider's fetch and degrades that one provider to an empty catalog. Unconfigured adapters
+   * return an empty list.
    */
   default List<String> listModels() {
     return List.of();
-  }
-
-  /** The configured default model id, or {@code null} when the adapter has none (unavailable). */
-  default String defaultModel() {
-    return null;
   }
 }

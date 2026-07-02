@@ -3,6 +3,8 @@ package com.promptarena.comparison;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.anEmptyMap;
 import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -11,6 +13,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import com.promptarena.catalog.ModelCatalogService;
+import com.promptarena.dto.ProviderCatalogEntry;
 import com.promptarena.model.Comparison;
 import com.promptarena.model.Outcome;
 import com.promptarena.model.Provider;
@@ -18,22 +22,27 @@ import com.promptarena.model.ProviderResult;
 import com.promptarena.model.User;
 import com.promptarena.repository.ComparisonRepository;
 import com.promptarena.repository.UserRepository;
+import java.util.Collection;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * End-to-end MockMvc tests for the comparison endpoints (session auth as the seeded demo user).
- * Provider keys are forced blank (test properties outrank real environment variables) so the model
- * catalog consulted by {@code POST} is fully curated — deterministic and offline.
+ * Provider keys are forced blank (test properties outrank real environment variables) and the model
+ * catalog is mocked with a fixed "live" list per provider, so no live fetch ever happens —
+ * deterministic and offline. FR-020: every selected provider requires an explicit model choice.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -44,18 +53,38 @@ import org.springframework.transaction.annotation.Transactional;
       "OPENAI_API_KEY=",
       "ANTHROPIC_API_KEY=",
       "XAI_API_KEY=",
-      "DEEPSEEK_API_KEY=",
-      "GOOGLE_MODEL=",
-      "OPENAI_MODEL=",
-      "ANTHROPIC_MODEL=",
-      "XAI_MODEL=",
-      "DEEPSEEK_MODEL="
+      "DEEPSEEK_API_KEY="
     })
 class ComparisonEndpointTest {
+
+  /** The stand-in for each provider's live model list (what its own API would report). */
+  private static final Map<Provider, List<String>> LIVE_MODELS =
+      Map.of(
+          Provider.GEMINI, List.of("gemini-2.5-flash", "gemini-2.5-pro"),
+          Provider.CHATGPT, List.of("gpt-4o-mini"),
+          Provider.CLAUDE, List.of("claude-haiku-4-5", "claude-sonnet-4-5"),
+          Provider.GROK, List.of("grok-4"),
+          Provider.DEEPSEEK, List.of("deepseek-chat"));
 
   @Autowired private MockMvc mockMvc;
   @Autowired private ComparisonRepository comparisons;
   @Autowired private UserRepository users;
+  @MockitoBean private ModelCatalogService modelCatalog;
+
+  @BeforeEach
+  void stubCatalog() {
+    when(modelCatalog.catalogFor(any()))
+        .thenAnswer(
+            invocation -> {
+              Collection<Provider> requested = invocation.getArgument(0);
+              Map<Provider, ProviderCatalogEntry> catalog = new EnumMap<>(Provider.class);
+              for (Provider provider : requested) {
+                catalog.put(
+                    provider, new ProviderCatalogEntry(provider, true, LIVE_MODELS.get(provider)));
+              }
+              return catalog;
+            });
+  }
 
   private MockHttpServletRequestBuilder authedPost(String json) {
     return post("/api/comparisons")
@@ -69,6 +98,16 @@ class ComparisonEndpointTest {
     return "{\"prompt\":\"" + prompt + "\",\"providers\":" + providersJsonArray + "}";
   }
 
+  private static String requestBody(String prompt, String providersJsonArray, String modelsJson) {
+    return "{\"prompt\":\""
+        + prompt
+        + "\",\"providers\":"
+        + providersJsonArray
+        + ",\"models\":"
+        + modelsJson
+        + "}";
+  }
+
   @Test
   void unauthenticatedRequestIsRejected() throws Exception {
     mockMvc.perform(get("/api/comparisons")).andExpect(status().isUnauthorized());
@@ -78,7 +117,12 @@ class ComparisonEndpointTest {
   void createPersistsPendingAndIsListedAndDetailed() throws Exception {
     String response =
         mockMvc
-            .perform(authedPost(requestBody("Explain entanglement", "[\"CLAUDE\",\"CHATGPT\"]")))
+            .perform(
+                authedPost(
+                    requestBody(
+                        "Explain entanglement",
+                        "[\"CLAUDE\",\"CHATGPT\"]",
+                        "{\"CLAUDE\":\"claude-sonnet-4-5\",\"CHATGPT\":\"gpt-4o-mini\"}")))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.comparisonId").exists())
             .andExpect(jsonPath("$.providers[0]").value("CLAUDE"))
@@ -170,12 +214,35 @@ class ComparisonEndpointTest {
   }
 
   @Test
-  void modelForUnselectedProviderIsRejected() throws Exception {
+  void absentModelsMapIsRejected() throws Exception {
+    mockMvc
+        .perform(authedPost(requestBody("hi", "[\"CLAUDE\"]")))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value("missing_model"));
+  }
+
+  @Test
+  void partialModelsMapIsRejected() throws Exception {
     mockMvc
         .perform(
             authedPost(
-                "{\"prompt\":\"hi\",\"providers\":[\"CLAUDE\"],"
-                    + "\"models\":{\"GEMINI\":\"gemini-2.5-pro\"}}"))
+                requestBody("hi", "[\"CLAUDE\",\"GEMINI\"]", "{\"CLAUDE\":\"claude-sonnet-4-5\"}")))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value("missing_model"));
+  }
+
+  @Test
+  void blankModelValueIsRejected() throws Exception {
+    mockMvc
+        .perform(authedPost(requestBody("hi", "[\"CLAUDE\"]", "{\"CLAUDE\":\"   \"}")))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value("missing_model"));
+  }
+
+  @Test
+  void modelForUnselectedProviderIsRejected() throws Exception {
+    mockMvc
+        .perform(authedPost(requestBody("hi", "[\"CLAUDE\"]", "{\"GEMINI\":\"gemini-2.5-pro\"}")))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error").value("model_for_unselected_provider"));
   }
@@ -183,9 +250,7 @@ class ComparisonEndpointTest {
   @Test
   void modelForUnknownProviderNameIsRejected() throws Exception {
     mockMvc
-        .perform(
-            authedPost(
-                "{\"prompt\":\"hi\",\"providers\":[\"CLAUDE\"],\"models\":{\"FOO\":\"bar\"}}"))
+        .perform(authedPost(requestBody("hi", "[\"CLAUDE\"]", "{\"FOO\":\"bar\"}")))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error").value("model_for_unselected_provider"));
   }
@@ -193,41 +258,40 @@ class ComparisonEndpointTest {
   @Test
   void modelOutsideTheProviderCatalogIsRejected() throws Exception {
     mockMvc
-        .perform(
-            authedPost(
-                "{\"prompt\":\"hi\",\"providers\":[\"CLAUDE\"],"
-                    + "\"models\":{\"CLAUDE\":\"clod-9000\"}}"))
+        .perform(authedPost(requestBody("hi", "[\"CLAUDE\"]", "{\"CLAUDE\":\"clod-9000\"}")))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error").value("unknown_model"));
   }
 
   @Test
-  void explicitModelChoiceIsPersistedAndDefaultsFillTheRest() throws Exception {
+  void chosenModelsArePersistedVerbatim() throws Exception {
     String response =
         mockMvc
             .perform(
                 authedPost(
-                    "{\"prompt\":\"hi\",\"providers\":[\"CLAUDE\",\"GEMINI\"],"
-                        + "\"models\":{\"CLAUDE\":\"claude-haiku-4-5\"}}"))
+                    requestBody(
+                        "hi",
+                        "[\"CLAUDE\",\"GEMINI\"]",
+                        "{\"CLAUDE\":\"claude-haiku-4-5\",\"GEMINI\":\"gemini-2.5-pro\"}")))
             .andExpect(status().isCreated())
             .andReturn()
             .getResponse()
             .getContentAsString();
     String id = JsonPath.read(response, "$.comparisonId");
 
-    // The explicit choice and GEMINI's resolved default are persisted with the comparison.
+    // The explicit choices are persisted with the comparison exactly as validated — no resolution.
     Comparison persisted = comparisons.findById(id).orElseThrow();
     assertThat(persisted.getModels())
         .isEqualTo(
             Map.of(
                 Provider.CLAUDE, "claude-haiku-4-5",
-                Provider.GEMINI, "gemini-2.5-flash"));
+                Provider.GEMINI, "gemini-2.5-pro"));
 
     mockMvc
         .perform(get("/api/comparisons/{id}", id).with(user("demo").roles("USER")))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.models.CLAUDE").value("claude-haiku-4-5"))
-        .andExpect(jsonPath("$.models.GEMINI").value("gemini-2.5-flash"));
+        .andExpect(jsonPath("$.models.GEMINI").value("gemini-2.5-pro"));
   }
 
   @Test

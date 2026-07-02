@@ -76,8 +76,9 @@ public class ComparisonController {
 
   /**
    * Validate, persist a {@code PENDING} comparison owned by the caller, return its id (FR-004/5/6).
-   * The model each selected provider will run is resolved now — the explicit choice or the
-   * provider's current default — and persisted with the comparison (FR-020).
+   * The request MUST name a model for every selected provider, chosen from that provider's current
+   * live catalog — there are no defaults. The validated map is persisted as-is with the comparison
+   * (FR-020).
    */
   @PostMapping
   public ResponseEntity<CreateComparisonResponse> create(
@@ -86,11 +87,8 @@ public class ComparisonController {
         ComparisonValidator.validate(body.prompt(), body.providers(), maxPromptLen);
     Map<Provider, ProviderCatalogEntry> catalog = modelCatalog.catalogFor(providers);
     Map<Provider, String> models =
-        ComparisonValidator.resolveModels(
-            body.models(),
-            providers,
-            provider -> Set.copyOf(catalog.get(provider).models()),
-            provider -> catalog.get(provider).defaultModel());
+        ComparisonValidator.requireModels(
+            body.models(), providers, provider -> Set.copyOf(catalog.get(provider).models()));
     User user = currentUser.require();
     Comparison comparison =
         comparisons.save(new Comparison(user, body.prompt(), providers, models));

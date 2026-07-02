@@ -40,7 +40,12 @@ class GeminiProviderTest {
   }
 
   private GeminiProvider provider(String apiKey) {
-    return new GeminiProvider(apiKey, "gemini-test", baseUrl);
+    return new GeminiProvider(apiKey, baseUrl);
+  }
+
+  /** FR-020: the model always rides the request — adapters have no configured model. */
+  private static PromptRequest request() {
+    return new PromptRequest("hi", "gemini-test");
   }
 
   /** A JSON error response — the SDK raises, mapping to ERROR. */
@@ -105,7 +110,7 @@ class GeminiProviderTest {
   void successfulResponseIsMappedToSuccess() {
     stubGenerateStream("Hello from Gemini");
 
-    ProviderResponse response = provider("test-key").complete(new PromptRequest("hi"));
+    ProviderResponse response = provider("test-key").complete(request());
 
     assertThat(response.provider()).isEqualTo(Provider.GEMINI);
     assertThat(response.outcome()).isEqualTo(Outcome.SUCCESS);
@@ -117,7 +122,7 @@ class GeminiProviderTest {
     stubGenerateStream("Hello", " from", " Gemini");
 
     List<String> tokens = new ArrayList<>();
-    ProviderResponse response = provider("test-key").stream(new PromptRequest("hi"), tokens::add);
+    ProviderResponse response = provider("test-key").stream(request(), tokens::add);
 
     assertThat(tokens).containsExactly("Hello", " from", " Gemini");
     assertThat(response.text()).isEqualTo("Hello from Gemini");
@@ -128,7 +133,7 @@ class GeminiProviderTest {
   void streamedSuccessHarvestsUsageModelAndTimeToFirstToken() {
     stubGenerateStream("Hello", " from", " Gemini");
 
-    ProviderResponse response = provider("test-key").stream(new PromptRequest("hi"), token -> {});
+    ProviderResponse response = provider("test-key").stream(request(), token -> {});
 
     // TTFT was stamped on the first delta, on the same clock as the total latency.
     assertThat(response.firstTokenMs()).isNotNull().isBetween(0L, response.responseTimeMs());
@@ -144,7 +149,7 @@ class GeminiProviderTest {
     stubIncompleteStream("A resposta começa", " e então é cortada");
 
     List<String> tokens = new ArrayList<>();
-    ProviderResponse response = provider("test-key").stream(new PromptRequest("hi"), tokens::add);
+    ProviderResponse response = provider("test-key").stream(request(), tokens::add);
 
     // The partial deltas still stream to the caller, but the result is a truncation error — never a
     // partial answer dressed up as a complete SUCCESS. A truncated stream carries no telemetry.
@@ -159,7 +164,7 @@ class GeminiProviderTest {
   void serverErrorIsMappedToError() {
     stubError(500);
 
-    ProviderResponse response = provider("test-key").complete(new PromptRequest("hi"));
+    ProviderResponse response = provider("test-key").complete(request());
 
     assertThat(response.outcome()).isEqualTo(Outcome.ERROR);
     assertThat(response.errorMessage()).isNotNull();
@@ -167,7 +172,7 @@ class GeminiProviderTest {
 
   @Test
   void nullKeyIsUnavailableAndYieldsError() {
-    ProviderResponse response = provider(null).complete(new PromptRequest("hi"));
+    ProviderResponse response = provider(null).complete(request());
 
     assertThat(response.outcome()).isEqualTo(Outcome.ERROR);
     assertThat(response.errorMessage()).isEqualTo("provider_not_configured");
@@ -175,22 +180,22 @@ class GeminiProviderTest {
 
   @Test
   void blankKeyIsUnavailableAndYieldsError() {
-    ProviderResponse response = provider("").complete(new PromptRequest("hi"));
+    ProviderResponse response = provider("").complete(request());
 
     assertThat(response.outcome()).isEqualTo(Outcome.ERROR);
     assertThat(response.errorMessage()).isEqualTo("provider_not_configured");
   }
 
+  /** FR-020: the model on the wire is exactly {@code request.model()} — there is no fallback. */
   @Test
-  void streamRequestsTheOverrideModelInsteadOfTheConfiguredOne() {
+  void streamSendsTheRequestedModelOnTheWire() {
     stubGenerateStream("Hello");
 
     ProviderResponse response =
-        provider("test-key").stream(new PromptRequest("hi", "gemini-override"), token -> {});
+        provider("test-key").stream(new PromptRequest("hi", "gemini-chosen"), token -> {});
 
     assertThat(response.outcome()).isEqualTo(Outcome.SUCCESS);
-    server.verify(
-        postRequestedFor(urlMatching(".*/models/gemini-override:streamGenerateContent.*")));
+    server.verify(postRequestedFor(urlMatching(".*/models/gemini-chosen:streamGenerateContent.*")));
   }
 
   /**
@@ -226,10 +231,5 @@ class GeminiProviderTest {
   @Test
   void listModelsIsEmptyWhenUnconfigured() {
     assertThat(provider(null).listModels()).isEmpty();
-  }
-
-  @Test
-  void defaultModelIsTheConfiguredModel() {
-    assertThat(provider("test-key").defaultModel()).isEqualTo("gemini-test");
   }
 }

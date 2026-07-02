@@ -13,7 +13,7 @@ import java.util.function.Function;
 /**
  * Validates a comparison request and parses provider names, mapping each failure to the
  * machine-readable error code of the REST contract (FR-005, FR-006, FR-020). Pure logic, no Spring
- * — the per-provider allowed-model sets and defaults are passed in by the caller.
+ * — the per-provider allowed-model sets are passed in by the caller.
  */
 final class ComparisonValidator {
 
@@ -60,37 +60,37 @@ final class ComparisonValidator {
   }
 
   /**
-   * Validate the optional per-provider model choices and resolve the model each selected provider
-   * will run: the explicit choice when one was made, otherwise that provider's default (FR-020). A
-   * choice for a provider that is not selected (or not a provider at all) fails with {@code
-   * model_for_unselected_provider}; a choice outside the provider's offered set fails with {@code
-   * unknown_model}. A {@code null} default leaves that provider unresolved (adapter falls back).
+   * Validate the per-provider model choices (FR-020): the map MUST name a model for every selected
+   * provider — there are no defaults anywhere. A choice for a provider that is not selected (or not
+   * a provider at all) fails with {@code model_for_unselected_provider}; a selected provider with
+   * no entry or a blank one fails with {@code missing_model}; a choice outside the provider's
+   * current catalog fails with {@code unknown_model}. Returns the validated choices, keyed by
+   * provider.
    */
-  static Map<Provider, String> resolveModels(
+  static Map<Provider, String> requireModels(
       Map<String, String> requestedModels,
       List<Provider> selectedProviders,
-      Function<Provider, Set<String>> allowedModels,
-      Function<Provider, String> defaultModels) {
-    Map<Provider, String> explicit = new EnumMap<>(Provider.class);
+      Function<Provider, Set<String>> allowedModels) {
+    Map<Provider, String> chosen = new EnumMap<>(Provider.class);
     if (requestedModels != null) {
       for (Map.Entry<String, String> choice : requestedModels.entrySet()) {
         Provider provider = parseSelected(choice.getKey(), selectedProviders);
         String model = choice.getValue();
-        if (model == null || model.isBlank() || !allowedModels.apply(provider).contains(model)) {
+        if (model == null || model.isBlank()) {
+          throw new ValidationException("missing_model");
+        }
+        if (!allowedModels.apply(provider).contains(model)) {
           throw new ValidationException("unknown_model");
         }
-        explicit.put(provider, model);
+        chosen.put(provider, model);
       }
     }
-    Map<Provider, String> resolved = new EnumMap<>(Provider.class);
     for (Provider provider : selectedProviders) {
-      String model =
-          explicit.containsKey(provider) ? explicit.get(provider) : defaultModels.apply(provider);
-      if (model != null) {
-        resolved.put(provider, model);
+      if (!chosen.containsKey(provider)) {
+        throw new ValidationException("missing_model");
       }
     }
-    return resolved;
+    return chosen;
   }
 
   private static Provider parseSelected(String name, List<Provider> selectedProviders) {

@@ -10,6 +10,7 @@ import com.promptarena.provider.LlmProvider;
 import com.promptarena.provider.ProviderRegistry;
 import com.promptarena.provider.ProviderResultMapper;
 import com.promptarena.repository.ComparisonRepository;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -58,15 +59,28 @@ public class ComparisonService {
   public int execute(
       String comparisonId, BiConsumer<Provider, String> onToken, Consumer<ResultEvent> onResult) {
     Comparison comparison = load(comparisonId);
-    // Each provider runs the model persisted at POST time (FR-020); providers with no entry
-    // (comparisons that predate model selection) get null and fall back to the adapter default.
+    // Each provider runs the model persisted at POST time (FR-020) — there are no defaults. A
+    // provider with no persisted model (legacy rows that predate model selection) is never
+    // dispatched: it gets its own ERROR result while the others proceed (same per-provider
+    // isolation as FR-010).
     Map<Provider, String> models = comparison.getModels();
-    List<ProviderResponse> responses =
+    List<Provider> dispatchable = new ArrayList<>();
+    List<ProviderResponse> responses = new ArrayList<>();
+    for (Provider provider : comparison.getProviders()) {
+      if (models.get(provider) != null) {
+        dispatchable.add(provider);
+      } else {
+        ProviderResponse noModel = ProviderResultMapper.error(provider, "no_model_recorded", null);
+        onResult.accept(toEvent(noModel));
+        responses.add(noModel);
+      }
+    }
+    responses.addAll(
         fanOut(
-            comparison.getProviders(),
+            dispatchable,
             provider -> new PromptRequest(comparison.getPrompt(), models.get(provider)),
             onToken,
-            response -> onResult.accept(toEvent(response)));
+            response -> onResult.accept(toEvent(response))));
     for (ProviderResponse response : responses) {
       comparison.addResult(
           new ProviderResult(

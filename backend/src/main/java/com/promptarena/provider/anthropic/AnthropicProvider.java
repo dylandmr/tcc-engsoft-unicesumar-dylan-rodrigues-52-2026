@@ -28,7 +28,6 @@ import java.util.function.Consumer;
  */
 public final class AnthropicProvider implements LlmProvider {
 
-  public static final String DEFAULT_MODEL = "claude-3-5-sonnet-latest";
   public static final String DEFAULT_BASE_URL = "https://api.anthropic.com";
 
   // The Messages API requires an explicit output cap (unlike the other providers, which default to
@@ -36,11 +35,9 @@ public final class AnthropicProvider implements LlmProvider {
   // deterministically truncated detailed responses mid-sentence.
   private static final long MAX_TOKENS = 4096L;
 
-  private final String model;
   private final AnthropicClient client;
 
-  public AnthropicProvider(String apiKey, String model, String baseUrl) {
-    this.model = model;
+  public AnthropicProvider(String apiKey, String baseUrl) {
     this.client =
         (apiKey == null || apiKey.isBlank())
             ? null
@@ -55,11 +52,6 @@ public final class AnthropicProvider implements LlmProvider {
   @Override
   public Provider id() {
     return Provider.CLAUDE;
-  }
-
-  @Override
-  public String defaultModel() {
-    return model;
   }
 
   /**
@@ -92,7 +84,7 @@ public final class AnthropicProvider implements LlmProvider {
     try {
       MessageCreateParams params =
           MessageCreateParams.builder()
-              .model(requestedModel(request))
+              .model(request.model())
               .maxTokens(MAX_TOKENS)
               .addUserMessage(request.prompt())
               .build();
@@ -143,11 +135,6 @@ public final class AnthropicProvider implements LlmProvider {
     } catch (RuntimeException ex) {
       return ProviderResultMapper.error(Provider.CLAUDE, ex.getMessage(), elapsedMs(start));
     }
-  }
-
-  /** The per-comparison model choice (FR-020), or this adapter's configured default. */
-  private String requestedModel(PromptRequest request) {
-    return request.model() != null ? request.model() : model;
   }
 
   private static long elapsedMs(long startNanos) {

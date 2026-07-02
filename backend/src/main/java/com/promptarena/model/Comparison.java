@@ -52,9 +52,9 @@ public class Comparison {
   private List<Provider> providers = new ArrayList<>();
 
   /**
-   * The model each selected provider runs, resolved at {@code POST} time (the user's explicit
-   * choice or the provider's configured default — FR-020). Comparisons persisted before model
-   * selection existed have no entries; dispatch then falls back to the provider's default.
+   * The model each selected provider runs, chosen explicitly by the user at {@code POST} time
+   * (FR-020 — no defaults exist). Comparisons persisted before model selection existed have no
+   * entries; dispatch never calls such a provider and records its own ERROR result instead.
    */
   @ElementCollection(fetch = FetchType.EAGER)
   @CollectionTable(name = "comparison_models", joinColumns = @JoinColumn(name = "comparison_id"))

@@ -19,6 +19,7 @@ import com.promptarena.provider.ProviderResultMapper;
 import com.promptarena.repository.ComparisonRepository;
 import com.promptarena.repository.UserRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,7 +63,12 @@ class PersistenceTest {
     Comparison pending =
         comparisons.save(
             new Comparison(
-                alice, "explain entanglement", List.of(Provider.CLAUDE, Provider.GEMINI)));
+                alice,
+                "explain entanglement",
+                List.of(Provider.CLAUDE, Provider.GEMINI),
+                Map.of(
+                    Provider.CLAUDE, "claude-chosen",
+                    Provider.GEMINI, "gemini-chosen")));
 
     when(registry.get(Provider.CLAUDE))
         .thenReturn(

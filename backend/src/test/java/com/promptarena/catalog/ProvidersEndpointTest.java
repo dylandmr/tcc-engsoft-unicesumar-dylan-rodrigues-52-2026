@@ -14,8 +14,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * End-to-end MockMvc tests for {@code GET /api/providers} (FR-020). All provider keys are forced
- * blank (test properties outrank real environment variables), so every provider is unconfigured and
- * the catalog is fully curated — deterministic and offline.
+ * blank (test properties outrank real environment variables), so every provider is unconfigured, no
+ * live fetch ever happens, and every catalog is empty — deterministic and offline.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -25,12 +25,7 @@ import org.springframework.test.web.servlet.MockMvc;
       "OPENAI_API_KEY=",
       "ANTHROPIC_API_KEY=",
       "XAI_API_KEY=",
-      "DEEPSEEK_API_KEY=",
-      "GOOGLE_MODEL=",
-      "OPENAI_MODEL=",
-      "ANTHROPIC_MODEL=",
-      "XAI_MODEL=",
-      "DEEPSEEK_MODEL="
+      "DEEPSEEK_API_KEY="
     })
 class ProvidersEndpointTest {
 
@@ -42,7 +37,7 @@ class ProvidersEndpointTest {
   }
 
   @Test
-  void listsAllProvidersInCanonicalOrderWithCuratedCatalogs() throws Exception {
+  void listsAllProvidersInCanonicalOrderWithEmptyCatalogsWhenUnconfigured() throws Exception {
     mockMvc
         .perform(get("/api/providers").with(user("demo").roles("USER")))
         .andExpect(status().isOk())
@@ -53,14 +48,11 @@ class ProvidersEndpointTest {
         .andExpect(jsonPath("$.providers[3].provider").value("GROK"))
         .andExpect(jsonPath("$.providers[4].provider").value("DEEPSEEK"))
         .andExpect(jsonPath("$.providers[0].configured").value(false))
-        .andExpect(jsonPath("$.providers[0].defaultModel").value("gemini-2.5-flash"))
-        .andExpect(jsonPath("$.providers[0].source").value("curated"))
-        // Sorted ascending, deduplicated, and always containing the default model.
-        .andExpect(jsonPath("$.providers[0].models[0]").value("gemini-2.0-flash"))
-        .andExpect(jsonPath("$.providers[0].models[1]").value("gemini-2.5-flash"))
-        .andExpect(jsonPath("$.providers[0].models[2]").value("gemini-2.5-flash-lite"))
-        .andExpect(jsonPath("$.providers[0].models[3]").value("gemini-2.5-pro"))
-        .andExpect(jsonPath("$.providers[2].defaultModel").value("claude-3-5-sonnet-latest"))
-        .andExpect(jsonPath("$.providers[4].defaultModel").value("deepseek-chat"));
+        // Unconfigured providers report an empty live catalog — nothing is selectable.
+        .andExpect(jsonPath("$.providers[0].models").isEmpty())
+        .andExpect(jsonPath("$.providers[4].models").isEmpty())
+        // FR-020 v2: no default (or curated-source) model fields exist anywhere.
+        .andExpect(jsonPath("$.providers[0].defaultModel").doesNotExist())
+        .andExpect(jsonPath("$.providers[0].source").doesNotExist());
   }
 }

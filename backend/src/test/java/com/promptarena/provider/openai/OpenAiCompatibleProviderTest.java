@@ -45,7 +45,12 @@ class OpenAiCompatibleProviderTest {
   }
 
   private OpenAiCompatibleProvider provider(Provider id, String apiKey) {
-    return new OpenAiCompatibleProvider(id, apiKey, "gpt-test", baseUrl);
+    return new OpenAiCompatibleProvider(id, apiKey, baseUrl);
+  }
+
+  /** FR-020: the model always rides the request — adapters have no configured model. */
+  private static PromptRequest request() {
+    return new PromptRequest("hi", "gpt-test");
   }
 
   /** Mirrors the live OpenAI-style {@code GET /v1/models} list shape for the given model ids. */
@@ -130,7 +135,7 @@ class OpenAiCompatibleProviderTest {
   void successfulResponseIsMappedToSuccess() {
     stubChatStream("Hello there");
 
-    ProviderResponse response = provider("test-key").complete(new PromptRequest("hi"));
+    ProviderResponse response = provider("test-key").complete(request());
 
     assertThat(response.provider()).isEqualTo(Provider.CHATGPT);
     assertThat(response.outcome()).isEqualTo(Outcome.SUCCESS);
@@ -144,7 +149,7 @@ class OpenAiCompatibleProviderTest {
     stubChatStream("Hello", " there", "!");
 
     List<String> tokens = new ArrayList<>();
-    ProviderResponse response = provider("test-key").stream(new PromptRequest("hi"), tokens::add);
+    ProviderResponse response = provider("test-key").stream(request(), tokens::add);
 
     assertThat(tokens).containsExactly("Hello", " there", "!");
     assertThat(response.text()).isEqualTo("Hello there!");
@@ -155,7 +160,7 @@ class OpenAiCompatibleProviderTest {
   void streamedSuccessHarvestsUsageModelAndTimeToFirstToken() {
     stubChatStream("Hello", " there");
 
-    ProviderResponse response = provider("test-key").stream(new PromptRequest("hi"), token -> {});
+    ProviderResponse response = provider("test-key").stream(request(), token -> {});
 
     // TTFT was stamped on the first delta, on the same clock as the total latency.
     assertThat(response.firstTokenMs()).isNotNull().isBetween(0L, response.responseTimeMs());
@@ -171,7 +176,7 @@ class OpenAiCompatibleProviderTest {
     stubIncompleteChatStream("The answer starts", " and is then cut");
 
     List<String> tokens = new ArrayList<>();
-    ProviderResponse response = provider("test-key").stream(new PromptRequest("hi"), tokens::add);
+    ProviderResponse response = provider("test-key").stream(request(), tokens::add);
 
     // The partial deltas still stream to the caller, but the result is a truncation error — never a
     // partial answer dressed up as a complete SUCCESS. A truncated stream carries no telemetry.
@@ -186,7 +191,7 @@ class OpenAiCompatibleProviderTest {
   void blankContentIsMappedToEmpty() {
     stubChatStream("");
 
-    ProviderResponse response = provider("test-key").complete(new PromptRequest("hi"));
+    ProviderResponse response = provider("test-key").complete(request());
 
     assertThat(response.outcome()).isEqualTo(Outcome.EMPTY);
     assertThat(response.text()).isEmpty();
@@ -196,7 +201,7 @@ class OpenAiCompatibleProviderTest {
   void serverErrorIsMappedToError() {
     stubError(500);
 
-    ProviderResponse response = provider("test-key").complete(new PromptRequest("hi"));
+    ProviderResponse response = provider("test-key").complete(request());
 
     assertThat(response.outcome()).isEqualTo(Outcome.ERROR);
     assertThat(response.errorMessage()).isNotNull();
@@ -205,7 +210,7 @@ class OpenAiCompatibleProviderTest {
 
   @Test
   void nullKeyIsUnavailableAndYieldsError() {
-    ProviderResponse response = provider(null).complete(new PromptRequest("hi"));
+    ProviderResponse response = provider(null).complete(request());
 
     assertThat(response.outcome()).isEqualTo(Outcome.ERROR);
     assertThat(response.errorMessage()).isEqualTo("provider_not_configured");
@@ -213,23 +218,24 @@ class OpenAiCompatibleProviderTest {
 
   @Test
   void blankKeyIsUnavailableAndYieldsError() {
-    ProviderResponse response = provider("   ").complete(new PromptRequest("hi"));
+    ProviderResponse response = provider("   ").complete(request());
 
     assertThat(response.outcome()).isEqualTo(Outcome.ERROR);
     assertThat(response.errorMessage()).isEqualTo("provider_not_configured");
   }
 
+  /** FR-020: the model on the wire is exactly {@code request.model()} — there is no fallback. */
   @Test
-  void streamRequestsTheOverrideModelInsteadOfTheConfiguredOne() {
+  void streamSendsTheRequestedModelOnTheWire() {
     stubChatStream("Hello");
 
     ProviderResponse response =
-        provider("test-key").stream(new PromptRequest("hi", "gpt-override"), token -> {});
+        provider("test-key").stream(new PromptRequest("hi", "gpt-chosen"), token -> {});
 
     assertThat(response.outcome()).isEqualTo(Outcome.SUCCESS);
     server.verify(
         postRequestedFor(anyUrl())
-            .withRequestBody(matchingJsonPath("$.model", equalTo("gpt-override"))));
+            .withRequestBody(matchingJsonPath("$.model", equalTo("gpt-chosen"))));
   }
 
   @Test
@@ -267,10 +273,5 @@ class OpenAiCompatibleProviderTest {
   @Test
   void listModelsIsEmptyWhenUnconfigured() {
     assertThat(provider(null).listModels()).isEmpty();
-  }
-
-  @Test
-  void defaultModelIsTheConfiguredModel() {
-    assertThat(provider("test-key").defaultModel()).isEqualTo("gpt-test");
   }
 }

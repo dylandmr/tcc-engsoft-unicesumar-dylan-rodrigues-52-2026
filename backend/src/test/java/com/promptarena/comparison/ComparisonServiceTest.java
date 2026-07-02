@@ -2,7 +2,10 @@ package com.promptarena.comparison;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.promptarena.dto.PromptRequest;
@@ -188,7 +191,9 @@ class ComparisonServiceTest {
   @Test
   void executePersistsResultsAndMarksComplete() {
     User user = new User("alice", "hash");
-    Comparison comparison = new Comparison(user, "prompt", List.of(Provider.CLAUDE));
+    Comparison comparison =
+        new Comparison(
+            user, "prompt", List.of(Provider.CLAUDE), Map.of(Provider.CLAUDE, "claude-chosen"));
     when(comparisons.findById("c1")).thenReturn(Optional.of(comparison));
     register(Map.of(Provider.CLAUDE, adapter(Provider.CLAUDE, ComparisonServiceTest::ok)));
     List<ResultEvent> events = new ArrayList<>();
@@ -206,7 +211,9 @@ class ComparisonServiceTest {
   @Test
   void executePersistsTelemetryAndEmitsItOnTheResultEvent() {
     User user = new User("alice", "hash");
-    Comparison comparison = new Comparison(user, "prompt", List.of(Provider.CLAUDE));
+    Comparison comparison =
+        new Comparison(
+            user, "prompt", List.of(Provider.CLAUDE), Map.of(Provider.CLAUDE, "claude-chosen"));
     when(comparisons.findById("c1")).thenReturn(Optional.of(comparison));
     register(Map.of(Provider.CLAUDE, adapter(Provider.CLAUDE, ComparisonServiceTest::ok)));
     List<ResultEvent> events = new ArrayList<>();
@@ -229,7 +236,28 @@ class ComparisonServiceTest {
   @Test
   void executeDispatchesThePersistedModelPerProvider() {
     User user = new User("alice", "hash");
-    // CLAUDE has a persisted model choice (FR-020); GEMINI predates model selection (no entry).
+    Comparison comparison =
+        new Comparison(
+            user, "prompt", List.of(Provider.CLAUDE), Map.of(Provider.CLAUDE, "claude-haiku-4-5"));
+    when(comparisons.findById("c1")).thenReturn(Optional.of(comparison));
+    Map<Provider, PromptRequest> seen = new ConcurrentHashMap<>();
+    register(Map.of(Provider.CLAUDE, capturing(Provider.CLAUDE, seen)));
+
+    service(45_000).execute("c1", (p, t) -> {}, event -> {});
+
+    assertThat(seen.get(Provider.CLAUDE).model()).isEqualTo("claude-haiku-4-5");
+    assertThat(seen.get(Provider.CLAUDE).prompt()).isEqualTo("prompt");
+  }
+
+  /**
+   * Legacy guard (FR-020): a provider with no persisted model (rows that predate model selection)
+   * is never dispatched — it gets its own {@code no_model_recorded} ERROR result, emitted and
+   * persisted alongside the others, which proceed normally.
+   */
+  @Test
+  void executeNeverDispatchesAProviderWithoutAPersistedModel() {
+    User user = new User("alice", "hash");
+    // CLAUDE has a persisted model choice; GEMINI predates model selection (no entry).
     Comparison comparison =
         new Comparison(
             user,
@@ -238,16 +266,28 @@ class ComparisonServiceTest {
             Map.of(Provider.CLAUDE, "claude-haiku-4-5"));
     when(comparisons.findById("c1")).thenReturn(Optional.of(comparison));
     Map<Provider, PromptRequest> seen = new ConcurrentHashMap<>();
-    register(
-        Map.of(
-            Provider.CLAUDE, capturing(Provider.CLAUDE, seen),
-            Provider.GEMINI, capturing(Provider.GEMINI, seen)));
+    register(Map.of(Provider.CLAUDE, capturing(Provider.CLAUDE, seen)));
+    List<ResultEvent> events = new CopyOnWriteArrayList<>();
 
-    service(45_000).execute("c1", (p, t) -> {}, event -> {});
+    int completed = service(45_000).execute("c1", (p, t) -> {}, events::add);
 
-    assertThat(seen.get(Provider.CLAUDE).model()).isEqualTo("claude-haiku-4-5");
-    assertThat(seen.get(Provider.CLAUDE).prompt()).isEqualTo("prompt");
-    assertThat(seen.get(Provider.GEMINI).model()).isNull();
+    // GEMINI's adapter was never looked up or called; CLAUDE ran its chosen model.
+    verify(registry, never()).get(Provider.GEMINI);
+    assertThat(seen.keySet()).containsExactly(Provider.CLAUDE);
+    // Both providers still report — GEMINI as its own error — and both are persisted.
+    assertThat(completed).isEqualTo(2);
+    ResultEvent gemini =
+        events.stream()
+            .filter(event -> event.provider() == Provider.GEMINI)
+            .findFirst()
+            .orElseThrow();
+    assertThat(gemini.outcome()).isEqualTo(Outcome.ERROR);
+    assertThat(gemini.errorMessage()).isEqualTo("no_model_recorded");
+    assertThat(comparison.getStatus()).isEqualTo(Status.COMPLETE);
+    assertThat(comparison.getResults())
+        .extracting(ProviderResult::getProvider, ProviderResult::getOutcome)
+        .containsExactlyInAnyOrder(
+            tuple(Provider.GEMINI, Outcome.ERROR), tuple(Provider.CLAUDE, Outcome.SUCCESS));
   }
 
   /** An adapter that records the exact {@link PromptRequest} it was dispatched with. */
