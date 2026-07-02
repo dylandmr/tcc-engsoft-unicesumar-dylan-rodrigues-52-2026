@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import type { LaneState } from '../../hooks/arenaReducer'
+import type { AnalysisState, LaneState } from '../../hooks/arenaReducer'
 import type {
   RaceSummary as RaceSummaryData,
   SummaryRow,
 } from '../../lib/raceSummary'
+import { KeyDifferences, type AnalyzeHandler } from './KeyDifferences'
 import { providerMeta } from '../../lib/providers'
 import { PROVIDER_STYLES } from '../../lib/providerStyles'
 import { laneStatusInfo } from '../../lib/laneStatus'
@@ -121,11 +122,23 @@ const NO_DATA = 'sem dados desta execução'
 /**
  * "Resumo da corrida" — the post-race telemetry drawer docked under the lanes
  * (FR-008/FR-019). Slides up once every provider has reported; the lanes'
- * flex-1 grid makes room as it grows.
+ * flex-1 grid makes room as it grows. With two or more successful answers it
+ * also carries the "DIFERENÇAS-CHAVE" judge-analysis section (FR-021).
  */
-export function RaceSummary({ summary }: { summary: RaceSummaryData }) {
+export function RaceSummary({
+  summary,
+  analysis,
+  onAnalyze,
+}: {
+  summary: RaceSummaryData
+  analysis: AnalysisState
+  onAnalyze: AnalyzeHandler
+}) {
   const [expanded, setExpanded] = useState(true)
   const winner = summary.rows.find((row) => row.rank === 1)
+  // The analysis needs ≥2 successful answers to compare (FR-021) — 'done' is
+  // exactly the SUCCESS outcome ('empty' lanes have nothing to compare).
+  const successes = summary.rows.filter((row) => row.status === 'done').length
 
   return (
     <motion.section
@@ -191,6 +204,9 @@ export function RaceSummary({ summary }: { summary: RaceSummaryData }) {
             </>
           ) : (
             <p className="py-1 font-mono text-xs text-mist">{NO_DATA}</p>
+          )}
+          {successes >= 2 && (
+            <KeyDifferences analysis={analysis} onAnalyze={onAnalyze} />
           )}
         </div>
       )}

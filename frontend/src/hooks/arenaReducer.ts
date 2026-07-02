@@ -1,4 +1,11 @@
-import type { ChunkEvent, Outcome, ProviderId, ProviderResult } from '../types'
+import type {
+  AnalysisResult,
+  ChunkEvent,
+  Outcome,
+  ProviderId,
+  ProviderResult,
+  RecordedAnalysis,
+} from '../types'
 
 export type LaneStatus =
   'live' | 'done' | 'empty' | 'error' | 'timeout' | 'disabled'
@@ -29,10 +36,27 @@ export interface LaneState {
   first: boolean
 }
 
+/** Shown when the judge fails or its stream cannot be opened (FR-021). */
+export const ANALYSIS_ERROR_MESSAGE =
+  'Não foi possível gerar a análise. Tente outra juíza.'
+
+/**
+ * Lifecycle of the on-demand key-differences analysis (FR-021):
+ * `idle` (no analysis yet — the judge picker shows) → `streaming` (judge
+ * deltas accumulate) → `done` (recorded analysis) | `error` (retryable — the
+ * picker shows again). A replayed analysis lands directly in `done`.
+ */
+export type AnalysisState =
+  | { phase: 'idle' }
+  | { phase: 'streaming'; text: string }
+  | { phase: 'done'; analysis: RecordedAnalysis }
+  | { phase: 'error'; message: string }
+
 export interface ArenaState {
   order: ProviderId[]
   lanes: Record<ProviderId, LaneState>
   done: boolean
+  analysis: AnalysisState
 }
 
 const OUTCOME_STATUS: Record<Outcome, LaneStatus> = {
@@ -48,6 +72,10 @@ export type ArenaAction =
   | { type: 'result'; result: ProviderResult }
   | { type: 'streamError' }
   | { type: 'done' }
+  | { type: 'analysisStart' }
+  | { type: 'analysisChunk'; delta: string }
+  | { type: 'analysisResult'; analysis: AnalysisResult }
+  | { type: 'analysisError' }
 
 /** Build the initial all-live lane state for the selected providers. */
 export function initArena(providers: ProviderId[]): ArenaState {
@@ -67,7 +95,7 @@ export function initArena(providers: ProviderId[]): ArenaState {
       first: false,
     }
   }
-  return { order: providers, lanes, done: false }
+  return { order: providers, lanes, done: false, analysis: { phase: 'idle' } }
 }
 
 function patchLane(
@@ -143,5 +171,37 @@ export function arenaReducer(
     }
     case 'done':
       return { ...state, done: true }
+    case 'analysisStart':
+      return { ...state, analysis: { phase: 'streaming', text: '' } }
+    case 'analysisChunk':
+      // Deltas only grow an in-flight analysis — a stray late delta must not
+      // resurrect a finished (or never-started) stream.
+      return state.analysis.phase === 'streaming'
+        ? {
+            ...state,
+            analysis: {
+              phase: 'streaming',
+              text: state.analysis.text + action.delta,
+            },
+          }
+        : state
+    case 'analysisResult': {
+      // Terminal event of a generation — or the replay re-emitted by the
+      // results stream, which lands directly in `done` (FR-021). A judge
+      // failure (null text / errorMessage set) is retryable with any judge.
+      const { text, errorMessage, provider, model, labels } = action.analysis
+      return {
+        ...state,
+        analysis:
+          text === null || errorMessage !== null
+            ? { phase: 'error', message: ANALYSIS_ERROR_MESSAGE }
+            : { phase: 'done', analysis: { text, provider, model, labels } },
+      }
+    }
+    case 'analysisError':
+      return {
+        ...state,
+        analysis: { phase: 'error', message: ANALYSIS_ERROR_MESSAGE },
+      }
   }
 }

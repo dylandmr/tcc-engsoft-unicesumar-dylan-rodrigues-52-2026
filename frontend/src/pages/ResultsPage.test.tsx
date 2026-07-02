@@ -1,9 +1,34 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { http, server } from '../../testing/server'
+import { http, recordedAnalysis, server } from '../../testing/server'
 import { sseResponse } from '../../testing/sse'
 import { ResultsPage } from './ResultsPage'
+
+/** Two successful lanes — enough for the key-differences section (FR-021). */
+const twoSuccessResults = [
+  {
+    event: 'result',
+    data: {
+      provider: 'GEMINI',
+      outcome: 'SUCCESS',
+      responseText: 'devagar',
+      errorMessage: null,
+      responseTimeMs: 2500,
+    },
+  },
+  {
+    event: 'result',
+    data: {
+      provider: 'CLAUDE',
+      outcome: 'SUCCESS',
+      responseText: 'rápido',
+      errorMessage: null,
+      responseTimeMs: 1200,
+    },
+  },
+]
 
 function renderResults(state: unknown) {
   return render(
@@ -97,26 +122,7 @@ describe('ResultsPage', () => {
     server.use(
       http.get('/api/comparisons/:id/stream', () =>
         sseResponse([
-          {
-            event: 'result',
-            data: {
-              provider: 'GEMINI',
-              outcome: 'SUCCESS',
-              responseText: 'devagar',
-              errorMessage: null,
-              responseTimeMs: 2500,
-            },
-          },
-          {
-            event: 'result',
-            data: {
-              provider: 'CLAUDE',
-              outcome: 'SUCCESS',
-              responseText: 'rápido',
-              errorMessage: null,
-              responseTimeMs: 1200,
-            },
-          },
+          ...twoSuccessResults,
           { event: 'done', data: { comparisonId: 'c1', completed: 2 } },
         ]),
       ),
@@ -131,5 +137,67 @@ describe('ResultsPage', () => {
     expect(
       within(gemini).queryByText('primeiro a responder'),
     ).not.toBeInTheDocument()
+    // Two successes surface the judge picker — let its catalog fetch settle.
+    expect(
+      await screen.findByRole('combobox', { name: 'Juíza' }),
+    ).toBeInTheDocument()
+  })
+
+  it('replays a recorded analysis from the results stream without the picker', async () => {
+    server.use(
+      http.get('/api/comparisons/:id/stream', () =>
+        sseResponse([
+          ...twoSuccessResults,
+          { event: 'analysis', data: recordedAnalysis },
+          { event: 'done', data: { comparisonId: 'c1', completed: 2 } },
+        ]),
+      ),
+    )
+    renderResults({ providers: ['GEMINI', 'CLAUDE'] })
+    expect(await screen.findByText('DIFERENÇAS-CHAVE')).toBeInTheDocument()
+    expect(
+      screen.getByText('juíza: Claude · claude-haiku-4-5'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Modelo A → Gemini')).toBeInTheDocument()
+    expect(
+      screen.queryByRole('combobox', { name: 'Juíza' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('runs the judge end-to-end from the drawer picker', async () => {
+    server.use(
+      http.get('/api/comparisons/:id/stream', () =>
+        sseResponse([
+          ...twoSuccessResults,
+          { event: 'done', data: { comparisonId: 'c1', completed: 2 } },
+        ]),
+      ),
+      http.get('/api/comparisons/:id/analysis/stream', () =>
+        sseResponse([
+          { event: 'analysis-chunk', data: { delta: '## Cobertura' } },
+          { event: 'analysis', data: recordedAnalysis },
+          { event: 'done', data: { comparisonId: 'c1' } },
+        ]),
+      ),
+    )
+    renderResults({ providers: ['GEMINI', 'CLAUDE'] })
+    await screen.findByText('DIFERENÇAS-CHAVE')
+    await userEvent.selectOptions(
+      await screen.findByRole('combobox', { name: 'Juíza' }),
+      'CLAUDE',
+    )
+    await userEvent.click(
+      screen.getByRole('combobox', { name: 'Modelo da juíza' }),
+    )
+    await userEvent.click(
+      screen.getByRole('option', { name: 'claude-3-5-haiku-latest' }),
+    )
+    await userEvent.click(
+      screen.getByRole('button', { name: 'analisar diferenças' }),
+    )
+    expect(
+      await screen.findByText('juíza: Claude · claude-haiku-4-5'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Modelo B → Claude')).toBeInTheDocument()
   })
 })

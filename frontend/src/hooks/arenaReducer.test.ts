@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { arenaReducer, initArena } from './arenaReducer'
-import type { ProviderResult } from '../types'
+import { ANALYSIS_ERROR_MESSAGE, arenaReducer, initArena } from './arenaReducer'
+import type { AnalysisResult, ProviderResult } from '../types'
 
 const result = (over: Partial<ProviderResult>): ProviderResult => ({
   provider: 'CLAUDE',
@@ -131,5 +131,92 @@ describe('arenaReducer', () => {
 
   it('done marks the run complete', () => {
     expect(arenaReducer(start, { type: 'done' }).done).toBe(true)
+  })
+})
+
+const analysisEvent = (over: Partial<AnalysisResult> = {}): AnalysisResult => ({
+  text: '## Diferenças',
+  errorMessage: null,
+  provider: 'CLAUDE',
+  model: 'claude-haiku-4-5',
+  labels: { A: 'GEMINI', B: 'CLAUDE' },
+  ...over,
+})
+
+describe('arenaReducer analysis (FR-021)', () => {
+  const start = initArena(['CLAUDE', 'GEMINI'])
+
+  it('starts idle — no analysis exists until the user asks for one', () => {
+    expect(start.analysis).toEqual({ phase: 'idle' })
+  })
+
+  it('analysisStart opens an empty streaming buffer', () => {
+    const s = arenaReducer(start, { type: 'analysisStart' })
+    expect(s.analysis).toEqual({ phase: 'streaming', text: '' })
+  })
+
+  it('accumulates judge deltas while streaming', () => {
+    let s = arenaReducer(start, { type: 'analysisStart' })
+    s = arenaReducer(s, { type: 'analysisChunk', delta: '## Dif' })
+    s = arenaReducer(s, { type: 'analysisChunk', delta: 'erenças' })
+    expect(s.analysis).toEqual({ phase: 'streaming', text: '## Diferenças' })
+  })
+
+  it('ignores a stray delta when no analysis is streaming', () => {
+    expect(arenaReducer(start, { type: 'analysisChunk', delta: 'x' })).toBe(
+      start,
+    )
+  })
+
+  it('records a successful terminal event as done', () => {
+    const streaming = arenaReducer(start, { type: 'analysisStart' })
+    const s = arenaReducer(streaming, {
+      type: 'analysisResult',
+      analysis: analysisEvent(),
+    })
+    expect(s.analysis).toEqual({
+      phase: 'done',
+      analysis: {
+        text: '## Diferenças',
+        provider: 'CLAUDE',
+        model: 'claude-haiku-4-5',
+        labels: { A: 'GEMINI', B: 'CLAUDE' },
+      },
+    })
+  })
+
+  it('lands a replayed analysis directly in done (no streaming first)', () => {
+    const s = arenaReducer(start, {
+      type: 'analysisResult',
+      analysis: analysisEvent(),
+    })
+    expect(s.analysis.phase).toBe('done')
+  })
+
+  it('maps a judge failure (null text) to a retryable error', () => {
+    const s = arenaReducer(start, {
+      type: 'analysisResult',
+      analysis: analysisEvent({ text: null, errorMessage: 'judge_failed' }),
+    })
+    expect(s.analysis).toEqual({
+      phase: 'error',
+      message: ANALYSIS_ERROR_MESSAGE,
+    })
+  })
+
+  it('treats a terminal event carrying an errorMessage as a failure even with text', () => {
+    const s = arenaReducer(start, {
+      type: 'analysisResult',
+      analysis: analysisEvent({ errorMessage: 'stream_truncated' }),
+    })
+    expect(s.analysis.phase).toBe('error')
+  })
+
+  it('analysisError flags a failed judge stream as retryable', () => {
+    const s = arenaReducer(start, { type: 'analysisError' })
+    expect(s.analysis).toEqual({
+      phase: 'error',
+      message: ANALYSIS_ERROR_MESSAGE,
+    })
   })
 })

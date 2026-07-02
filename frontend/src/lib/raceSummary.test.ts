@@ -27,7 +27,12 @@ const lane = (provider: ProviderId, over: Partial<LaneState>): LaneState => ({
 function state(lanes: LaneState[]): ArenaState {
   const record = {} as Record<ProviderId, LaneState>
   for (const l of lanes) record[l.provider] = l
-  return { order: lanes.map((l) => l.provider), lanes: record, done: true }
+  return {
+    order: lanes.map((l) => l.provider),
+    lanes: record,
+    done: true,
+    analysis: { phase: 'idle' },
+  }
 }
 
 describe('buildRaceSummary ranking', () => {

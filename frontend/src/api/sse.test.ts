@@ -1,9 +1,20 @@
 import { describe, expect, it, vi } from 'vitest'
-import { http, HttpResponse, server, sseResponse } from '../../testing/server'
+import {
+  http,
+  HttpResponse,
+  recordedAnalysis,
+  server,
+  sseResponse,
+} from '../../testing/server'
 import { encodeSseEvent } from '../../testing/sse'
 import { ApiError } from './client'
-import { parseBlock, streamComparison } from './sse'
-import type { ChunkEvent, DoneEvent, ProviderResult } from '../types'
+import { parseBlock, streamAnalysis, streamComparison } from './sse'
+import type {
+  AnalysisResult,
+  ChunkEvent,
+  DoneEvent,
+  ProviderResult,
+} from '../types'
 
 describe('parseBlock', () => {
   it('parses an event name and JSON data', () => {
@@ -94,6 +105,82 @@ describe('streamComparison', () => {
         onChunk: vi.fn(),
         onResult: vi.fn(),
         onDone: vi.fn(),
+      }),
+    ).rejects.toBeInstanceOf(ApiError)
+  })
+})
+
+describe('streamComparison analysis replay (FR-021)', () => {
+  const replayStream = () =>
+    sseResponse([
+      { event: 'analysis', data: recordedAnalysis },
+      { event: 'done', data: { comparisonId: 'c1', completed: 2 } },
+    ])
+
+  it('surfaces a replayed analysis event to the onAnalysis handler', async () => {
+    server.use(http.get('/api/comparisons/:id/stream', replayStream))
+    const analyses: AnalysisResult[] = []
+    const onDone = vi.fn()
+    await streamComparison('c1', {
+      onChunk: vi.fn(),
+      onResult: vi.fn(),
+      onDone,
+      onAnalysis: (analysis) => analyses.push(analysis),
+    })
+    expect(analyses).toEqual([recordedAnalysis])
+    expect(onDone).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves callers without an onAnalysis handler unaffected (additive event)', async () => {
+    server.use(http.get('/api/comparisons/:id/stream', replayStream))
+    const onDone = vi.fn()
+    await streamComparison('c1', {
+      onChunk: vi.fn(),
+      onResult: vi.fn(),
+      onDone,
+    })
+    expect(onDone).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('streamAnalysis', () => {
+  it('sends the picked judge as query params and dispatches chunk + terminal events', async () => {
+    let requestedUrl = ''
+    server.use(
+      http.get('/api/comparisons/:id/analysis/stream', ({ request }) => {
+        requestedUrl = request.url
+        return sseResponse([
+          { event: 'analysis-chunk', data: { delta: '## Cob' } },
+          { event: 'analysis-chunk', data: { delta: 'ertura' } },
+          { event: 'ping', data: { keepAlive: true } },
+          { event: 'analysis', data: recordedAnalysis },
+          { event: 'done', data: { comparisonId: 'c1' } },
+        ])
+      }),
+    )
+    const deltas: string[] = []
+    const analyses: AnalysisResult[] = []
+    await streamAnalysis('c1', 'CLAUDE', 'claude-haiku-4-5', {
+      onChunk: (chunk) => deltas.push(chunk.delta),
+      onAnalysis: (analysis) => analyses.push(analysis),
+    })
+    expect(deltas.join('')).toBe('## Cobertura')
+    expect(analyses).toEqual([recordedAnalysis])
+    const params = new URL(requestedUrl).searchParams
+    expect(params.get('provider')).toBe('CLAUDE')
+    expect(params.get('model')).toBe('claude-haiku-4-5')
+  })
+
+  it('throws ApiError when the judge is rejected on open (400)', async () => {
+    server.use(
+      http.get('/api/comparisons/:id/analysis/stream', () =>
+        HttpResponse.json({ error: 'insufficient_results' }, { status: 400 }),
+      ),
+    )
+    await expect(
+      streamAnalysis('c1', 'CLAUDE', 'claude-haiku-4-5', {
+        onChunk: vi.fn(),
+        onAnalysis: vi.fn(),
       }),
     ).rejects.toBeInstanceOf(ApiError)
   })

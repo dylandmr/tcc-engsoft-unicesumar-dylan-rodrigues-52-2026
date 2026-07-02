@@ -1,4 +1,11 @@
-import type { ChunkEvent, DoneEvent, ProviderResult } from '../types'
+import type {
+  AnalysisChunkEvent,
+  AnalysisResult,
+  ChunkEvent,
+  DoneEvent,
+  ProviderId,
+  ProviderResult,
+} from '../types'
 import { ApiError } from './client'
 
 export interface ParsedEvent {
@@ -22,39 +29,25 @@ export function parseBlock(block: string): ParsedEvent | null {
   return { event, data: JSON.parse(dataLine) }
 }
 
-export interface StreamHandlers {
-  onChunk: (chunk: ChunkEvent) => void
-  onResult: (result: ProviderResult) => void
-  onDone: (done: DoneEvent) => void
-}
-
-function dispatch(block: string, handlers: StreamHandlers): void {
-  const evt = parseBlock(block)
-  if (!evt) return
-  if (evt.event === 'chunk') handlers.onChunk(evt.data as ChunkEvent)
-  else if (evt.event === 'result') handlers.onResult(evt.data as ProviderResult)
-  else if (evt.event === 'done') handlers.onDone(evt.data as DoneEvent)
-  // Any other event name is ignored (e.g. keep-alive comments carry no data).
-}
-
 /**
- * Open the comparison SSE stream and dispatch each `result` / `done` event as
- * it arrives. Uses `fetch` + a streamed `ReadableStream` body (rather than
- * native EventSource) so the same GET endpoint, cookie auth and event grammar
- * work identically under jsdom + MSW in tests. Cookies ride along via
- * `credentials: 'include'`, matching the contract's session-cookie auth.
+ * Fetch an SSE endpoint and feed each parsed event block to `dispatch`. Uses
+ * `fetch` + a streamed `ReadableStream` body (rather than native EventSource)
+ * so the same GET endpoint, cookie auth and event grammar work identically
+ * under jsdom + MSW in tests. Cookies ride along via `credentials: 'include'`,
+ * matching the contract's session-cookie auth.
  */
-export async function streamComparison(
-  comparisonId: string,
-  handlers: StreamHandlers,
+async function readEventStream(
+  url: string,
+  errorCode: string,
+  dispatch: (evt: ParsedEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> {
-  const res = await fetch(`/api/comparisons/${comparisonId}/stream`, {
+  const res = await fetch(url, {
     credentials: 'include',
     headers: { Accept: 'text/event-stream' },
     signal,
   })
-  if (!res.ok) throw new ApiError('stream_failed', res.status)
+  if (!res.ok) throw new ApiError(errorCode, res.status)
 
   const reader = res.body!.getReader()
   const decoder = new TextDecoder()
@@ -65,8 +58,83 @@ export async function streamComparison(
     buffer += decoder.decode(value, { stream: true })
     let idx: number
     while ((idx = buffer.indexOf('\n\n')) !== -1) {
-      dispatch(buffer.slice(0, idx), handlers)
+      const evt = parseBlock(buffer.slice(0, idx))
+      if (evt) dispatch(evt)
       buffer = buffer.slice(idx + 2)
     }
   }
+}
+
+export interface StreamHandlers {
+  onChunk: (chunk: ChunkEvent) => void
+  onResult: (result: ProviderResult) => void
+  onDone: (done: DoneEvent) => void
+  /**
+   * Replaying a COMPLETE comparison also re-emits its recorded analysis
+   * (FR-021) before `done`. Optional — the event is additive to the
+   * contract, so callers that ignore it are unaffected.
+   */
+  onAnalysis?: (analysis: AnalysisResult) => void
+}
+
+/**
+ * Open the comparison SSE stream and dispatch each `chunk` / `result` /
+ * `analysis` / `done` event as it arrives. Unknown event names are ignored,
+ * keeping the stream forward-compatible.
+ */
+export async function streamComparison(
+  comparisonId: string,
+  handlers: StreamHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  return readEventStream(
+    `/api/comparisons/${comparisonId}/stream`,
+    'stream_failed',
+    (evt) => {
+      if (evt.event === 'chunk') handlers.onChunk(evt.data as ChunkEvent)
+      else if (evt.event === 'result')
+        handlers.onResult(evt.data as ProviderResult)
+      else if (evt.event === 'analysis')
+        handlers.onAnalysis?.(evt.data as AnalysisResult)
+      else if (evt.event === 'done') handlers.onDone(evt.data as DoneEvent)
+      // Any other event name is ignored (e.g. keep-alive comments carry no data).
+    },
+    signal,
+  )
+}
+
+export interface AnalysisStreamHandlers {
+  onChunk: (chunk: AnalysisChunkEvent) => void
+  onAnalysis: (analysis: AnalysisResult) => void
+}
+
+/**
+ * Open the on-demand "key differences" judge stream (FR-021): incremental
+ * `analysis-chunk` deltas followed by the terminal `analysis` event. The
+ * judge is always the user's explicit pick — provider and model ride as
+ * query parameters (FR-020: no default judge). `done` merely closes the
+ * stream; unknown events are ignored.
+ */
+export async function streamAnalysis(
+  comparisonId: string,
+  judgeProvider: ProviderId,
+  judgeModel: string,
+  handlers: AnalysisStreamHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  const judge = new URLSearchParams({
+    provider: judgeProvider,
+    model: judgeModel,
+  })
+  return readEventStream(
+    `/api/comparisons/${comparisonId}/analysis/stream?${judge}`,
+    'analysis_failed',
+    (evt) => {
+      if (evt.event === 'analysis-chunk')
+        handlers.onChunk(evt.data as AnalysisChunkEvent)
+      else if (evt.event === 'analysis')
+        handlers.onAnalysis(evt.data as AnalysisResult)
+    },
+    signal,
+  )
 }

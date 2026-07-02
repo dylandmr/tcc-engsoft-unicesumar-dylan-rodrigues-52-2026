@@ -33,6 +33,34 @@ export interface DoneEvent {
   completed: number
 }
 
+/** Payload of an SSE `analysis-chunk` event — an incremental judge text delta (FR-021). */
+export interface AnalysisChunkEvent {
+  delta: string
+}
+
+/**
+ * Terminal payload of the SSE `analysis` event (FR-021). On judge failure,
+ * `text` is null and `errorMessage` is set — nothing is persisted, so the
+ * user may retry with any judge.
+ */
+export interface AnalysisResult {
+  text: string | null
+  errorMessage: string | null
+  /** The judge the user picked (FR-020: no default judge). */
+  provider: ProviderId
+  model: string
+  /** Neutral anonymization labels → provider, e.g. { A: 'GEMINI' }. */
+  labels: Record<string, ProviderId>
+}
+
+/** A successfully recorded analysis, as persisted with the comparison (FR-021). */
+export interface RecordedAnalysis {
+  text: string
+  provider: ProviderId
+  model: string
+  labels: Record<string, ProviderId>
+}
+
 /** Response of POST /api/comparisons. */
 export interface CreatedComparison {
   comparisonId: string

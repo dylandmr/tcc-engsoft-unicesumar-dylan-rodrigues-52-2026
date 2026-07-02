@@ -18,7 +18,7 @@ interface ArenaProps {
 
 /** The live results arena: one race-lane per provider, filling independently. */
 export function Arena({ comparisonId, providers, prompt, models }: ArenaProps) {
-  const state = useArena(comparisonId, providers)
+  const { state, startAnalysis } = useArena(comparisonId, providers)
   // The winner badge and the post-race drawer are both derived from persisted
   // responseTimeMs — SSE arrival order lies on history replay (results are
   // re-emitted in selection order there).
@@ -61,7 +61,13 @@ export function Arena({ comparisonId, providers, prompt, models }: ArenaProps) {
       </div>
 
       <AnimatePresence>
-        {state.done && <RaceSummary summary={summary} />}
+        {state.done && (
+          <RaceSummary
+            summary={summary}
+            analysis={state.analysis}
+            onAnalyze={startAnalysis}
+          />
+        )}
       </AnimatePresence>
     </div>
   )

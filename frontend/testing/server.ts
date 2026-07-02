@@ -43,6 +43,18 @@ export const providerCatalog = [
   },
 ]
 
+/**
+ * A recorded FR-021 analysis, exactly as the terminal `analysis` SSE event
+ * (and the results stream's replay) carries it.
+ */
+export const recordedAnalysis = {
+  text: '## Cobertura\n\n**Modelo A** cita fontes; **Modelo B** é mais direto.',
+  errorMessage: null,
+  provider: 'CLAUDE',
+  model: 'claude-haiku-4-5',
+  labels: { A: 'GEMINI', B: 'CLAUDE' },
+}
+
 export const handlers = [
   http.post('/api/auth/login', () => HttpResponse.json({ username: 'alice' })),
   http.get('/api/auth/me', () => HttpResponse.json({ username: 'alice' })),
