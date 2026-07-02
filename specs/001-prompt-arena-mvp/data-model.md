@@ -53,16 +53,19 @@ A single submitted prompt and the set of providers it targeted (FR-014).
 | created_at   | timestamp     | Not null, default now; history is ordered by this descending |
 
 A `Comparison` also carries one **selected model per provider** (element collection
-`comparison_models`: `comparison_id`, `provider`, `model` — FR-020). The model is resolved at
-`POST` time (the user's explicit choice, or the provider's configured default when none was made)
-and is the model the lazy fan-out requests from that provider. Comparisons persisted before model
-selection existed have no rows here; dispatch then falls back to the provider's configured default.
+`comparison_models`: `comparison_id`, `provider`, `model` — FR-020). The model is the user's
+explicit choice, required for every selected provider and validated at `POST` time against the
+models that provider's API reports; it is the model the lazy fan-out requests from that provider.
+There are no default models. Comparisons persisted before model selection existed have no rows
+here; if such a comparison is still `PENDING` when its stream opens, each provider without a
+recorded model yields its own `ERROR` result (nothing valid to request) without being called.
 
 **Rules**:
 - `prompt` MUST be non-empty (FR-006). A maximum length is enforced (see research / quickstart).
 - A `Comparison` MUST reference between 1 and 4 providers via its `ProviderResult` children (FR-005).
-- Each selected provider has at most one entry in `comparison_models`, and its value MUST have been
-  in that provider's offered model set when the comparison was created (FR-020).
+- Each selected provider has exactly one entry in `comparison_models` (for comparisons created
+  after model selection existed), and its value MUST have been in that provider's API-reported
+  model set when the comparison was created (FR-020).
 - Only **completed** comparisons are guaranteed to be persisted (spec Assumptions: in-flight on
   logout not guaranteed).
 - A `Comparison` is only ever readable by its owning `user_id` (FR-016).
@@ -149,4 +152,4 @@ COMPLETE  — fan-out finished and ProviderResults persisted
 | History scoped to owning user                     | FR-015, FR-016 |
 | Per-provider response time captured               | Constitution / TCC |
 | Per-provider telemetry (TTFT, token usage, model) captured when reported | FR-019 |
-| Requested model per provider resolved on POST, validated against the offered set, persisted | FR-020 |
+| Model per provider explicitly chosen on POST, validated against the provider-reported set, persisted | FR-020 |

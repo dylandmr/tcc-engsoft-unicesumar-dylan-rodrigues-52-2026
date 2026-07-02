@@ -63,11 +63,11 @@ Return the current session's user; used by the SPA to gate protected screens.
 ### GET /api/providers
 
 Describe every supported provider for the composer: whether it is configured (has a server-side
-key), its default model, and the models selectable for it (FR-020). The `models` list is the
-**union** of a curated (predefined) list maintained by the system and the models the provider's own
-API reports as available; the live list is fetched only for configured providers, cached
-server-side for a short TTL, and a fetch failure silently degrades to the curated list (never an
-error — mirrors FR-010's isolation). `models` always contains `defaultModel`. Requires auth.
+key) and the models selectable for it (FR-020). `models` is **exactly** what that provider's own
+API reports as available — the system defines no default, curated, or hardcoded model choices. The
+live list is fetched only for configured providers, cached server-side for a short TTL, and a
+fetch failure yields an empty `models` for that provider only (never an error — mirrors FR-010's
+isolation). A provider with empty `models` cannot be part of a comparison. Requires auth.
 
 - **200 OK**
   ```json
@@ -76,24 +76,19 @@ error — mirrors FR-010's isolation). `models` always contains `defaultModel`. 
       {
         "provider": "GEMINI",
         "configured": true,
-        "defaultModel": "gemini-2.5-flash",
-        "models": ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"],
-        "source": "live"
+        "models": ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"]
       },
       {
         "provider": "CLAUDE",
         "configured": false,
-        "defaultModel": "claude-3-5-sonnet-latest",
-        "models": ["claude-3-5-haiku-latest", "claude-3-5-sonnet-latest"],
-        "source": "curated"
+        "models": []
       }
     ]
   }
   ```
   All five providers are always present, in the canonical order {`GEMINI`,`CHATGPT`,`CLAUDE`,
-  `GROK`,`DEEPSEEK`}. `models` is sorted ascending and deduplicated. `source` is `"live"` when the
-  provider's list API contributed entries, `"curated"` otherwise (unconfigured provider or fetch
-  failure).
+  `GROK`,`DEEPSEEK`}. `models` is sorted ascending and deduplicated; it is empty for unconfigured
+  providers and on live-fetch failure.
 - **401 Unauthorized**
 
 ---
@@ -119,17 +114,18 @@ Request:
 Validation (FR-005, FR-006, FR-020):
 - `prompt`: non-empty, length ≤ MAX_PROMPT_LEN (see quickstart).
 - `providers`: 1–4 entries, each from {`GEMINI`,`CHATGPT`,`CLAUDE`,`GROK`,`DEEPSEEK`}, no duplicates.
-- `models` (optional, FR-020): map of provider → model id. Each key MUST be one of the selected
-  `providers`; each value MUST be in that provider's current `models` set from `GET /api/providers`.
-  A provider with no entry runs its `defaultModel`. The resolved model per provider (explicit or
-  default) is persisted with the comparison and used when the lazy fan-out dispatches.
+- `models` (required, FR-020): map of provider → model id covering **every** selected provider.
+  Each key MUST be one of the selected `providers`; each value MUST be in that provider's current
+  `models` set from `GET /api/providers`. A selected provider without an entry (or with a blank
+  one) is rejected with `missing_model`. The chosen model per provider is persisted with the
+  comparison and used when the lazy fan-out dispatches.
 
 Responses:
 - **201 Created**
   ```json
   { "comparisonId": "c_01H...", "providers": ["CLAUDE", "CHATGPT", "GEMINI"] }
   ```
-- **400 Bad Request** — `{ "error": "empty_prompt" | "no_providers" | "too_many_providers" | "duplicate_provider" | "unknown_provider" | "prompt_too_long" | "unknown_model" | "model_for_unselected_provider" }`
+- **400 Bad Request** — `{ "error": "empty_prompt" | "no_providers" | "too_many_providers" | "duplicate_provider" | "unknown_provider" | "prompt_too_long" | "missing_model" | "unknown_model" | "model_for_unselected_provider" }`
 - **401 Unauthorized**
 
 The client then opens the SSE stream below to receive results live.

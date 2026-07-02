@@ -37,9 +37,9 @@ its provider responds, independently of the others.
 4. **Given** a signed-in user, **When** they attempt to select a fifth provider, **Then** selection
    beyond four is prevented and the limit is communicated.
 5. **Given** a signed-in user who has selected a provider, **When** they open that provider's model
-   selector, **Then** they can choose which of that provider's models answers the comparison from a
-   list combining predefined options with the models the provider's own API reports as available;
-   **and When** they make no choice, **Then** that provider's default model is used.
+   selector, **Then** they choose which model answers the comparison from exactly the models that
+   provider's own API reports as available; **and When** any selected provider has no chosen model,
+   **Then** submission is blocked with a clear validation message.
 
 ---
 
@@ -140,8 +140,9 @@ never appear.
 - How are concurrent submissions from the same user handled? Behavior MUST be defined so results are
   never mismatched to the wrong prompt.
 - What happens when a provider's model-list API is unreachable or the provider is not configured?
-  The model selector MUST still offer that provider's predefined (curated) models — a live-list
-  failure never blocks composing a comparison (mirrors the per-provider isolation principle).
+  That provider offers no models and cannot be selected for a comparison (there is nothing valid to
+  run) — its card states why — while every other provider remains fully usable (mirrors the
+  per-provider isolation principle).
 
 ## Requirements *(mandatory)*
 
@@ -191,14 +192,15 @@ never appear.
   input and output token counts, and the exact model identifier the provider reports as having
   answered. Each telemetry value is captured when the provider makes it available and recorded as
   absent (null) otherwise — e.g. a timed-out provider has no telemetry.
-- **FR-020**: System MUST let the user choose, per selected provider, which of that provider's
-  models answers the comparison. The choices offered per provider MUST combine a predefined
-  (curated) list maintained by the system with the models that provider's own API reports as
-  available (fetched live when the provider is configured, cached briefly, and falling back to the
-  curated list when the live fetch fails or the provider is unconfigured — the failure never blocks
-  composing). When the user makes no explicit choice, the provider's configured default model MUST
-  be used. The model actually requested per provider MUST be recorded with the comparison, and a
-  submission naming a model outside the offered set MUST be rejected with a validation error.
+- **FR-020**: System MUST require the user to choose, per selected provider, which of that
+  provider's models answers the comparison. The choices offered per provider MUST be exactly the
+  models that provider's own API reports as available (fetched live for configured providers and
+  cached briefly); the system MUST NOT define default, curated, or otherwise hardcoded model
+  choices. A comparison MUST NOT be submittable until every selected provider has an explicitly
+  chosen model, and a provider whose model list cannot be retrieved (unconfigured, or list-fetch
+  failure) MUST NOT be selectable — shown as unavailable without affecting the other providers.
+  The chosen model per provider MUST be recorded with the comparison, and a submission missing a
+  model or naming one outside the offered set MUST be rejected with a validation error.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -208,9 +210,8 @@ never appear.
   ChatGPT, Anthropic Claude, xAI Grok, DeepSeek). Key attributes: identity/label and availability
   for selection. Accessed through a uniform interface.
 - **Comparison**: A single submitted prompt and the set of providers it was sent to. Key attributes:
-  the prompt text, the submitting user, the selected providers, the model chosen for each selected
-  provider (explicit choice or the provider's default — FR-020), and a timestamp. Has one Provider
-  Result per selected provider.
+  the prompt text, the submitting user, the selected providers, the model explicitly chosen for
+  each selected provider (FR-020), and a timestamp. Has one Provider Result per selected provider.
 - **Provider Result**: One provider's outcome for a comparison. Key attributes: which provider, the
   response content (if any), the outcome state (success, empty, error, or timeout), and the recorded
   telemetry (response time, time-to-first-token, input/output token counts, exact model identifier —
