@@ -115,6 +115,10 @@ One provider's outcome for a comparison (FR-011, FR-013, FR-014).
   epoch as `response_time_ms`, so derived rates like tokens/s are consistent), the provider's own
   token usage, and the exact model identifier. All four are null when unavailable — e.g. `TIMEOUT`
   results (the adapter never returned) and `ERROR` results carry no telemetry.
+- The per-provider aggregate statistics (FR-023) are **derived at read time** from the caller's
+  `ProviderResult` rows (grouped by `provider`, joined through `Comparison.user_id` for scoping) —
+  no new table or column exists for them, and deleting comparisons (FR-022) therefore changes the
+  aggregates automatically.
 
 ## Enumerations
 
@@ -165,3 +169,4 @@ COMPLETE  — fan-out finished and ProviderResults persisted
 | Model per provider explicitly chosen on POST, validated against the provider-reported set, persisted | FR-020 |
 | Analysis generated on demand by a user-picked judge, anonymized/shuffled, no winner, persisted once, judge failure taints nothing | FR-021 |
 | Own-data-only deletion (single or all), cascading to results and element collections | FR-022, FR-016 |
+| Per-provider aggregates derived at read time from ProviderResult, scoped to the owner, honest telemetry basis | FR-023, FR-016, FR-019 |

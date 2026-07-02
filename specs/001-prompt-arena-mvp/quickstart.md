@@ -107,6 +107,11 @@ Each scenario maps to user stories and success criteria in [spec.md](./spec.md).
 4. **Deletion (FR-022)**: delete one history entry (confirmation required) → it disappears with all
    its recorded data; clear the whole history (confirmation required) → the empty state appears.
    Another user's history is unaffected either way.
+5. **Estatísticas (FR-023)**: with recorded comparisons, the top of History shows one aggregate
+   card per provider the user has run — run count, outcome breakdown, average latency / first
+   token / tokens-per-second — each average captioned with its honest basis ("telemetria em N de
+   M execuções"). Averages show as unavailable when no run carries telemetry; deleting entries
+   updates the aggregates; a user with no runs sees only the empty state (no statistics).
 
 ## Automated test validation (Constitution III)
 

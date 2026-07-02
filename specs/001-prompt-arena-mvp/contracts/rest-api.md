@@ -261,6 +261,44 @@ List the caller's past comparisons, newest first (FR-015, FR-017). Requires auth
   ```
   Empty history returns `{ "comparisons": [] }` (FR-017) — the SPA renders an empty state.
 
+### GET /api/comparisons/stats
+
+Aggregate per-provider statistics over the caller's own recorded provider results (FR-023,
+FR-016). Derived at read time — nothing persisted. Requires auth. (Routing note: the literal
+`stats` path segment must win over the `/{id}` detail route.)
+
+- **200 OK**
+  ```json
+  {
+    "stats": [
+      {
+        "provider": "GEMINI",
+        "runs": 9,
+        "successes": 7,
+        "empties": 0,
+        "errors": 1,
+        "timeouts": 1,
+        "telemetryRuns": 6,
+        "avgResponseTimeMs": 2310,
+        "avgFirstTokenMs": 820,
+        "avgTokensPerSecond": 41.2
+      }
+    ]
+  }
+  ```
+  One entry per provider that has at least one recorded result for the caller; providers the
+  caller never ran are absent, and a caller with no history gets `{ "stats": [] }`. Entries are
+  ordered by `avgResponseTimeMs` ascending (fastest first), with entries whose average is null
+  last, in provider declaration order. `runs` = `successes + empties + errors + timeouts`.
+  `telemetryRuns` counts the results whose telemetry was recorded (`responseTimeMs` present,
+  FR-019) — the honest basis the SPA captions ("telemetria em N de M execuções"). Each average is
+  computed over the results that carry the values it needs and is `null` when none do:
+  `avgResponseTimeMs` over recorded response times, `avgFirstTokenMs` over recorded first-token
+  times, and `avgTokensPerSecond` as the mean of each run's output tokens over its
+  first-token→completion window (runs with a non-positive window excluded) — the same per-run
+  definition the post-race summary uses.
+- **401 Unauthorized**
+
 ### DELETE /api/comparisons/{id}
 
 Permanently delete one comparison the caller owns, with everything recorded for it — provider
@@ -337,5 +375,6 @@ Full detail of one past comparison the caller owns, including each provider's re
 | DELETE /api/comparisons | FR-022, FR-016 |
 | GET /api/comparisons/{id}/stream | FR-008, FR-009, FR-010, FR-011, FR-012, FR-013, FR-019 |
 | GET /api/comparisons | FR-015, FR-016, FR-017 |
+| GET /api/comparisons/stats | FR-023, FR-016, FR-019 |
 | GET /api/comparisons/{id} | FR-014, FR-015, FR-016, FR-019 |
 | (all protected) | FR-001, FR-016; secrets server-side FR-018 |

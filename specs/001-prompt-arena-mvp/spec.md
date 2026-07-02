@@ -131,6 +131,11 @@ never appear.
    whole history (each behind an explicit confirmation), **Then** the removed comparisons are
    permanently gone — responses, telemetry, chosen models and analysis included — only their own
    data is affected, and the empty state appears when nothing remains.
+6. **Given** a user with recorded comparisons, **When** they open history, **Then** they see
+   per-provider aggregate statistics over their own runs — run counts, outcome breakdown, and
+   averaged telemetry with an honest "telemetria em N de M execuções" basis — and the aggregates
+   change accordingly when entries are deleted (FR-023). A user with no runs sees no statistics,
+   only the empty state.
 
 ---
 
@@ -228,6 +233,17 @@ never appear.
   user's comparison is never affected and never revealed), removes everything recorded for the
   deleted comparison(s) — provider results, telemetry, chosen models, and any recorded analysis —
   is irreversible, and MUST require an explicit confirmation in the UI before executing.
+- **FR-023**: System MUST show, atop the history view, aggregate per-provider statistics computed
+  on demand from the user's own recorded comparisons: how many runs each provider has (one run =
+  one recorded provider result), how those runs ended (successes, empty responses, errors,
+  timeouts), and — over the runs whose telemetry was recorded (FR-019) — the average response
+  time, average time-to-first-token, and average generation speed (output tokens over the
+  first-token→completion window, the same definition the post-race summary uses). Telemetry can
+  be absent (FR-019), so every average MUST state its basis honestly ("telemetria em N de M
+  execuções") and be shown as unavailable when no run carries the needed values. The aggregates
+  are derived at read time — nothing new is persisted — are scoped strictly to the requesting
+  user's own data (FR-016), and when the user has no recorded runs the statistics are simply
+  absent (the history empty state of FR-017 stands alone).
 
 ### Key Entities *(include if feature involves data)*
 
