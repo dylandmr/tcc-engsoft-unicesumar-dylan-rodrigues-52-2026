@@ -204,7 +204,8 @@ comparison the caller owns. `Content-Type: text/event-stream`. Requires auth (se
 so CSRF-exempt like the results stream).
 
 Query parameters (the judge — required on first generation, ignored on replay):
-- `provider` — judge provider, one of {`GEMINI`,`CHATGPT`,`CLAUDE`,`GROK`,`DEEPSEEK`}.
+- `provider` — judge provider, one of {`GEMINI`,`CHATGPT`,`CLAUDE`,`GROK`,`DEEPSEEK`}, and MUST NOT
+  be one of the comparison's competing providers (self-preference bias — FR-021).
 - `model` — judge model id; MUST be in that provider's current `models` set from
   `GET /api/providers` (FR-020 semantics — no default judge).
 
@@ -236,8 +237,9 @@ Events:
 
 Responses:
 - **200 OK** — `text/event-stream`.
-- **400 Bad Request** — `{ "error": "missing_model" | "unknown_model" | "unknown_provider" | "insufficient_results" | "comparison_not_complete" }`
-  (`insufficient_results`: fewer than two `SUCCESS` answers; judge params invalid per FR-020.)
+- **400 Bad Request** — `{ "error": "missing_model" | "unknown_model" | "unknown_provider" | "judge_in_race" | "insufficient_results" | "comparison_not_complete" }`
+  (`insufficient_results`: fewer than two `SUCCESS` answers; `judge_in_race`: the judge provider
+  competed in this comparison; judge params invalid per FR-020.)
 - **401 Unauthorized** / **404 Not Found** — as elsewhere.
 
 ### GET /api/comparisons
