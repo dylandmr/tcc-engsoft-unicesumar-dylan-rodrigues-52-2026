@@ -60,13 +60,20 @@ export function ContenderCard({
           )}
         />
       )}
+      {/* The 4px bar can't render the card's 13px corner radius itself (radii
+          clamp to the box height and the corners poke past the border curve),
+          so a full-size rounded overlay clips it to the card's outline. */}
       <span
         aria-hidden="true"
-        className={cn(
-          'h-1 flex-none rounded-t-[calc(var(--radius-panel)-1px)]',
-          armed ? style.bar : style.barDim,
-        )}
-      />
+        className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]"
+      >
+        <span
+          className={cn(
+            'absolute inset-x-0 top-0 h-1',
+            armed ? style.bar : style.barDim,
+          )}
+        />
+      </span>
 
       <button
         type="button"
@@ -76,7 +83,7 @@ export function ContenderCard({
         disabled={disabled}
         onClick={onToggle}
         className={cn(
-          'relative flex flex-1 flex-col items-start gap-1 px-4 pt-3 pb-3 text-left focus-visible:outline-none',
+          'relative flex flex-1 flex-col items-start gap-1 px-4 pt-4 pb-3 text-left focus-visible:outline-none',
           disabled && 'cursor-not-allowed opacity-40',
         )}
       >
