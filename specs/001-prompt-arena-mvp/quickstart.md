@@ -65,8 +65,10 @@ Each scenario maps to user stories and success criteria in [spec.md](./spec.md).
    provider responds, independently (a fast provider shows before a slow one). **Timing check
    (SC-001)**: the panels appear and the SSE stream opens within ~2s of submission (measure
    submit→first `result`/stream-open, excluding provider thinking time).
-4. Try to select a 5th provider → **blocked** with the limit communicated.
-5. Submit with empty prompt or zero providers → **blocked** with a validation message.
+4. After all providers report → **Expect**: a post-race telemetry summary below the panels ranking
+   providers by response time, with first-token latency, token counts, and model id (FR-008/FR-019).
+5. Try to select a 5th provider → **blocked** with the limit communicated.
+6. Submit with empty prompt or zero providers → **blocked** with a validation message.
 
 ### V2 — Isolated failure handling (User Story 2, SC-002)
 

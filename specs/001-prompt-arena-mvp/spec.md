@@ -155,7 +155,9 @@ never appear.
 - **FR-007**: System MUST dispatch the prompt to all selected providers concurrently, sending the
   same prompt to each.
 - **FR-008**: System MUST display one clearly labeled response panel per selected provider, arranged
-  for side-by-side comparison.
+  for side-by-side comparison. After all selected providers have reported, the results view MUST
+  present a comparative summary of the recorded telemetry (FR-019): a ranking by response time,
+  with each provider's first-token latency, token counts, and model identity.
 - **FR-009**: System MUST populate each provider's panel independently as that provider responds,
   without waiting for slower providers.
 - **FR-010**: System MUST isolate per-provider failures, timeouts, and errors so that one provider's
