@@ -97,6 +97,10 @@ const lane = (over: Partial<LaneState>): LaneState => ({
   text: '',
   errorMessage: null,
   responseTimeMs: null,
+  firstTokenMs: null,
+  inputTokens: null,
+  outputTokens: null,
+  model: null,
   elapsedMs: 0,
   first: false,
   ...over,
@@ -125,9 +129,20 @@ describe('ProviderLane', () => {
     )
     expect(screen.getByText('0.97s')).toBeInTheDocument()
     expect(screen.getByText('primeiro a responder')).toBeInTheDocument()
-    expect(screen.getByText('2 tokens')).toBeInTheDocument()
+    // No provider-reported count → an estimate, never labeled "tokens".
+    expect(screen.getByText('~2 palavras')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'copiar' }))
     expect(writeText).toHaveBeenCalledWith('two words')
+  })
+
+  it('prefers the provider-reported token count in the footer', () => {
+    render(
+      <ProviderLane
+        lane={lane({ status: 'done', text: 'two words', outputTokens: 128 })}
+      />,
+    )
+    expect(screen.getByText('128 tokens')).toBeInTheDocument()
+    expect(screen.queryByText(/palavras/)).not.toBeInTheDocument()
   })
 
   it('renders an empty-response lane distinctly', () => {

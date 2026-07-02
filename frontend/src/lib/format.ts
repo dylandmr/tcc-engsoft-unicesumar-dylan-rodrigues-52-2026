@@ -3,6 +3,16 @@ export function formatLatency(ms: number): string {
   return `${(ms / 1000).toFixed(2)}s`
 }
 
+/** Format the gap to the race winner in ms, e.g. 420 → "+0.42s". */
+export function formatDelta(ms: number): string {
+  return `+${(ms / 1000).toFixed(2)}s`
+}
+
+/** Format a decode throughput readout, e.g. 38.06 → "38.1 tok/s". */
+export function formatTokensPerSecond(n: number): string {
+  return `${n.toFixed(1)} tok/s`
+}
+
 /** Rough token estimate (whitespace-delimited words) for lane telemetry. */
 export function countTokens(text: string): number {
   const trimmed = text.trim()

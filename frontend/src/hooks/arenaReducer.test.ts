@@ -30,17 +30,46 @@ describe('arenaReducer', () => {
     expect(ticked.lanes.CLAUDE.elapsedMs).toBe(1840) // frozen at response time
   })
 
-  it('marks the first responder and maps outcome to status', () => {
+  it('maps the outcome to a status without stamping "first" (derived later)', () => {
+    // Arrival order lies on history replay — the winner badge is derived from
+    // persisted responseTimeMs (buildRaceSummary), never set by the reducer.
     const s1 = arenaReducer(start, { type: 'result', result: result({}) })
     expect(s1.lanes.CLAUDE.status).toBe('done')
-    expect(s1.lanes.CLAUDE.first).toBe(true)
-    expect(s1.firstAssigned).toBe(true)
+    expect(s1.lanes.CLAUDE.first).toBe(false)
+  })
 
-    const s2 = arenaReducer(s1, {
+  it('copies the FR-019 telemetry into the lane', () => {
+    const s = arenaReducer(start, {
       type: 'result',
-      result: result({ provider: 'CHATGPT' }),
+      result: result({
+        firstTokenMs: 420,
+        inputTokens: 12,
+        outputTokens: 128,
+        model: 'claude-sonnet-4-5',
+      }),
     })
-    expect(s2.lanes.CHATGPT.first).toBe(false) // not the first
+    expect(s.lanes.CLAUDE).toMatchObject({
+      firstTokenMs: 420,
+      inputTokens: 12,
+      outputTokens: 128,
+      model: 'claude-sonnet-4-5',
+    })
+  })
+
+  it('normalises absent telemetry to null', () => {
+    // History replay / older streams may omit the FR-019 fields entirely.
+    const bare = result({})
+    delete (bare as Partial<ProviderResult>).firstTokenMs
+    delete (bare as Partial<ProviderResult>).inputTokens
+    delete (bare as Partial<ProviderResult>).outputTokens
+    delete (bare as Partial<ProviderResult>).model
+    const s = arenaReducer(start, { type: 'result', result: bare })
+    expect(s.lanes.CLAUDE).toMatchObject({
+      firstTokenMs: null,
+      inputTokens: null,
+      outputTokens: null,
+      model: null,
+    })
   })
 
   it('treats an EMPTY outcome as a response (no text)', () => {
@@ -50,10 +79,9 @@ describe('arenaReducer', () => {
     })
     expect(s.lanes.CLAUDE.status).toBe('empty')
     expect(s.lanes.CLAUDE.text).toBe('')
-    expect(s.lanes.CLAUDE.first).toBe(true)
   })
 
-  it('does not award first to an error/timeout, and falls back to elapsed', () => {
+  it('falls back to the ticked elapsed time for an untimed timeout', () => {
     const ticked = arenaReducer(start, { type: 'tick', elapsedMs: 300 })
     const s = arenaReducer(ticked, {
       type: 'result',
@@ -64,8 +92,6 @@ describe('arenaReducer', () => {
       }),
     })
     expect(s.lanes.CLAUDE.status).toBe('timeout')
-    expect(s.lanes.CLAUDE.first).toBe(false)
-    expect(s.firstAssigned).toBe(false)
     expect(s.lanes.CLAUDE.elapsedMs).toBe(300)
   })
 
@@ -93,7 +119,6 @@ describe('arenaReducer', () => {
       }),
     })
     expect(s.lanes.CLAUDE.status).toBe('disabled')
-    expect(s.lanes.CLAUDE.first).toBe(false)
   })
 
   it('streamError fails every still-live lane', () => {

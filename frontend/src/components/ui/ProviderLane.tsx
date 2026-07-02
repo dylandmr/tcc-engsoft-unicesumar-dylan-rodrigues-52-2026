@@ -137,7 +137,12 @@ export function ProviderLane({
           transition={{ duration: 0.25 }}
           className="flex items-center justify-between border-t border-line px-5 py-3 font-mono text-xs text-mist"
         >
-          <span>{countTokens(lane.text)} tokens</span>
+          {/* API truth when reported; otherwise an estimate, never labeled "tokens". */}
+          <span>
+            {lane.outputTokens != null
+              ? `${lane.outputTokens} tokens`
+              : `~${countTokens(lane.text)} palavras`}
+          </span>
           <button
             type="button"
             onClick={copy}

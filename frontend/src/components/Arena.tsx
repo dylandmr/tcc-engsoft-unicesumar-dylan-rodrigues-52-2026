@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom'
+import { AnimatePresence } from 'framer-motion'
 import type { ProviderId } from '../types'
 import { useArena } from '../hooks/useArena'
+import { buildRaceSummary } from '../lib/raceSummary'
 import { ProviderLane } from './ui/ProviderLane'
+import { RaceSummary } from './ui/RaceSummary'
 import { Logo } from './ui/Logo'
 import { cn } from '../lib/cn'
 
@@ -14,6 +17,10 @@ interface ArenaProps {
 /** The live results arena: one race-lane per provider, filling independently. */
 export function Arena({ comparisonId, providers, prompt }: ArenaProps) {
   const state = useArena(comparisonId, providers)
+  // The winner badge and the post-race drawer are both derived from persisted
+  // responseTimeMs — SSE arrival order lies on history replay (results are
+  // re-emitted in selection order there).
+  const summary = buildRaceSummary(state)
 
   return (
     <div className="flex h-screen flex-col">
@@ -42,9 +49,17 @@ export function Arena({ comparisonId, providers, prompt }: ArenaProps) {
         }}
       >
         {state.order.map((id, index) => (
-          <ProviderLane key={id} lane={state.lanes[id]} index={index} />
+          <ProviderLane
+            key={id}
+            lane={{ ...state.lanes[id], first: id === summary.winner }}
+            index={index}
+          />
         ))}
       </div>
+
+      <AnimatePresence>
+        {state.done && <RaceSummary summary={summary} />}
+      </AnimatePresence>
     </div>
   )
 }

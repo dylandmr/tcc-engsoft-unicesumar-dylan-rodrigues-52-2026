@@ -1,10 +1,30 @@
 import { describe, expect, it } from 'vitest'
-import { countTokens, formatLatency, relativeTime } from './format'
+import {
+  countTokens,
+  formatDelta,
+  formatLatency,
+  formatTokensPerSecond,
+  relativeTime,
+} from './format'
 
 describe('formatLatency', () => {
   it('renders ms as seconds with two decimals', () => {
     expect(formatLatency(1840)).toBe('1.84s')
     expect(formatLatency(970)).toBe('0.97s')
+  })
+})
+
+describe('formatDelta', () => {
+  it('renders the gap to the winner as a signed seconds readout', () => {
+    expect(formatDelta(420)).toBe('+0.42s')
+    expect(formatDelta(0)).toBe('+0.00s')
+  })
+})
+
+describe('formatTokensPerSecond', () => {
+  it('renders throughput with one decimal', () => {
+    expect(formatTokensPerSecond(38.06)).toBe('38.1 tok/s')
+    expect(formatTokensPerSecond(50)).toBe('50.0 tok/s')
   })
 })
 
