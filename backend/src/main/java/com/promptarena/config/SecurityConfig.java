@@ -47,7 +47,9 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/auth/login")
                     .permitAll()
-                    // Serve the bundled SPA (static assets) same-origin
+                    // Serve the bundled SPA (static assets) same-origin, plus the SPA's
+                    // client-side routes (forwarded to index.html by SpaForwardingController so
+                    // deep links / hard refreshes work; data stays behind the /api routes).
                     .requestMatchers(
                         HttpMethod.GET,
                         "/",
@@ -56,7 +58,10 @@ public class SecurityConfig {
                         "/assets/**",
                         "/*.svg",
                         "/*.png",
-                        "/icons.svg")
+                        "/icons.svg",
+                        "/login",
+                        "/history",
+                        "/results/*")
                     .permitAll()
                     .anyRequest()
                     .authenticated())
