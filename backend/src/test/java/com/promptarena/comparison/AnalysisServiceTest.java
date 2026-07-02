@@ -172,10 +172,10 @@ class AnalysisServiceTest {
   void prepareRejectsAnAbsentOrBlankJudgeModel() {
     completeComparison(Provider.GEMINI, Provider.CLAUDE);
 
-    assertThatThrownBy(() -> service().prepare("c1", "CLAUDE", null))
+    assertThatThrownBy(() -> service().prepare("c1", "CHATGPT", null))
         .isInstanceOf(ValidationException.class)
         .hasMessage("missing_model");
-    assertThatThrownBy(() -> service().prepare("c1", "CLAUDE", "   "))
+    assertThatThrownBy(() -> service().prepare("c1", "CHATGPT", "   "))
         .isInstanceOf(ValidationException.class)
         .hasMessage("missing_model");
   }
@@ -183,11 +183,38 @@ class AnalysisServiceTest {
   @Test
   void prepareRejectsAJudgeModelOutsideTheLiveSet() {
     completeComparison(Provider.GEMINI, Provider.CLAUDE);
-    stubCatalog(Provider.CLAUDE, List.of("claude-x"));
+    stubCatalog(Provider.CHATGPT, List.of("gpt-x"));
 
-    assertThatThrownBy(() -> service().prepare("c1", "CLAUDE", "clod-9000"))
+    assertThatThrownBy(() -> service().prepare("c1", "CHATGPT", "clod-9000"))
         .isInstanceOf(ValidationException.class)
         .hasMessage("unknown_model");
+  }
+
+  /** A provider that answered in the race can never judge it (FR-021 — self-preference bias). */
+  @Test
+  void prepareRejectsAJudgeThatAnsweredInTheRace() {
+    completeComparison(Provider.GEMINI, Provider.CLAUDE);
+
+    assertThatThrownBy(() -> service().prepare("c1", "CLAUDE", "claude-x"))
+        .isInstanceOf(ValidationException.class)
+        .hasMessage("judge_in_race");
+  }
+
+  /** The guard also covers a selected provider that never produced a result row. */
+  @Test
+  void prepareRejectsAJudgeThatWasSelectedForTheRace() {
+    Comparison comparison =
+        new Comparison(new User("alice", "hash"), "the prompt", List.of(Provider.CHATGPT));
+    comparison.addResult(
+        new ProviderResult(Provider.GEMINI, Outcome.SUCCESS, "answer-a", null, 10L));
+    comparison.addResult(
+        new ProviderResult(Provider.CLAUDE, Outcome.SUCCESS, "answer-b", null, 10L));
+    comparison.markComplete();
+    when(comparisons.findById("c1")).thenReturn(Optional.of(comparison));
+
+    assertThatThrownBy(() -> service().prepare("c1", "CHATGPT", "gpt-x"))
+        .isInstanceOf(ValidationException.class)
+        .hasMessage("judge_in_race");
   }
 
   /** An unconfigured judge provider has an empty live set, so it fails as unknown_model. */

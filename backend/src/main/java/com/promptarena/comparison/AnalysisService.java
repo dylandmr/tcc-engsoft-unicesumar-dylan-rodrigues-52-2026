@@ -68,9 +68,9 @@ public class AnalysisService {
    * a generation, or {@code null} when a recorded analysis will be replayed (judge parameters are
    * then ignored per the contract). Throws a {@link ValidationException} carrying the contract's
    * machine-readable code otherwise: {@code comparison_not_complete}, {@code insufficient_results},
-   * or — FR-020 semantics for the judge — {@code unknown_provider} / {@code missing_model} / {@code
-   * unknown_model}. An unconfigured judge provider has an empty live model set, so it naturally
-   * fails as {@code unknown_model}.
+   * or — FR-020 semantics for the judge — {@code unknown_provider} / {@code judge_in_race} / {@code
+   * missing_model} / {@code unknown_model}. An unconfigured judge provider has an empty live model
+   * set, so it naturally fails as {@code unknown_model}.
    */
   @Transactional(readOnly = true)
   public JudgeSelection prepare(String comparisonId, String judgeProvider, String judgeModel) {
@@ -85,6 +85,15 @@ public class AnalysisService {
       throw new ValidationException("insufficient_results");
     }
     Provider provider = parseJudgeProvider(judgeProvider);
+    // A competitor judging its own race reintroduces the self-preference bias the anonymization
+    // exists to avoid (FR-021); with at most 4 of 5 providers racing, an outsider always exists.
+    // Checked against the selection AND the result rows so legacy rows are covered either way.
+    boolean competed =
+        comparison.getProviders().contains(provider)
+            || comparison.getResults().stream().anyMatch(r -> r.getProvider() == provider);
+    if (competed) {
+      throw new ValidationException("judge_in_race");
+    }
     if (judgeModel == null || judgeModel.isBlank()) {
       throw new ValidationException("missing_model");
     }

@@ -192,7 +192,7 @@ class AnalysisEndpointTest {
     mockMvc
         .perform(
             get("/api/comparisons/{id}/analysis/stream", comparison.getId())
-                .param("provider", "CLAUDE")
+                .param("provider", "CHATGPT")
                 .with(user("demo").roles("USER")))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error").value("missing_model"));
@@ -205,11 +205,26 @@ class AnalysisEndpointTest {
     mockMvc
         .perform(
             get("/api/comparisons/{id}/analysis/stream", comparison.getId())
-                .param("provider", "CLAUDE")
+                .param("provider", "CHATGPT")
                 .param("model", "clod-9000")
                 .with(user("demo").roles("USER")))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error").value("unknown_model"));
+  }
+
+  /** A competitor can never judge its own race (FR-021 — judge_in_race). */
+  @Test
+  void judgeThatCompetedInTheRaceIsRejected() throws Exception {
+    Comparison comparison = completeComparison(demo(), Provider.GEMINI, Provider.CLAUDE);
+
+    mockMvc
+        .perform(
+            get("/api/comparisons/{id}/analysis/stream", comparison.getId())
+                .param("provider", "CLAUDE")
+                .param("model", "claude-haiku-4-5")
+                .with(user("demo").roles("USER")))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.error").value("judge_in_race"));
   }
 
   /** An unconfigured judge provider has an empty live set — naturally rejected as unknown_model. */
