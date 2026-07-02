@@ -34,6 +34,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -142,6 +143,32 @@ public class ComparisonController {
         models,
         results,
         toAnalysisSummary(comparison));
+  }
+
+  /**
+   * Permanently delete one owned comparison and everything recorded for it — provider results,
+   * telemetry, chosen models, analysis (FR-022). An unknown id and another user's id are the same
+   * non-revealing 404 (FR-016). CSRF is enforced by the security chain (state-changing method).
+   * Transactional so the ownership load and the cascading entity delete share one persistence
+   * context.
+   */
+  @Transactional
+  @DeleteMapping("/{id}")
+  public ResponseEntity<Void> delete(@PathVariable String id) {
+    comparisons.delete(loadOwned(id));
+    return ResponseEntity.noContent().build();
+  }
+
+  /**
+   * Permanently clear the caller's entire history (FR-022). Only comparisons owned by the current
+   * user are touched (FR-016), and an already-empty history is a no-op — the endpoint is idempotent
+   * and always answers 204. CSRF is enforced by the security chain (state-changing method).
+   */
+  @Transactional
+  @DeleteMapping
+  public ResponseEntity<Void> clear() {
+    comparisons.deleteByUser(currentUser.require());
+    return ResponseEntity.noContent().build();
   }
 
   /**

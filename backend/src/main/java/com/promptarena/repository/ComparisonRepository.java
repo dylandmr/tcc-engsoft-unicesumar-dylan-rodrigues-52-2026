@@ -11,4 +11,13 @@ public interface ComparisonRepository extends JpaRepository<Comparison, String> 
   List<Comparison> findByUserOrderByCreatedAtDesc(User user);
 
   Optional<Comparison> findByIdAndUser(String id, User user);
+
+  /**
+   * Delete every comparison owned by {@code user} (FR-022). A derived delete loads and removes the
+   * entities one by one, so the {@code results} cascade and the element collections ({@code
+   * comparison_providers}, {@code comparison_models}, {@code comparison_analysis_order}) are all
+   * cleaned up — a bulk JPQL {@code DELETE} would bypass cascading and orphan those rows. Must run
+   * inside a caller-provided transaction.
+   */
+  void deleteByUser(User user);
 }
