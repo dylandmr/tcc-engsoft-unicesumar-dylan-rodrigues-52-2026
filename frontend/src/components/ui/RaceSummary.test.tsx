@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { AnalysisState } from '../../hooks/arenaReducer'
-import type { RecordedAnalysis } from '../../types'
 import { RaceSummary } from './RaceSummary'
 import type {
   RaceSummary as RaceSummaryData,
@@ -33,24 +31,12 @@ const summary = (over: Partial<RaceSummaryData>): RaceSummaryData => ({
   ...over,
 })
 
-const recorded: RecordedAnalysis = {
-  text: '**Modelo A** cita fontes.',
-  provider: 'CLAUDE',
-  model: 'claude-haiku-4-5',
-  labels: { A: 'GEMINI', B: 'CLAUDE' },
-}
-
-function renderSummary(
-  data: RaceSummaryData,
-  analysis: AnalysisState = { phase: 'idle' },
-) {
-  return render(
-    <RaceSummary summary={data} analysis={analysis} onAnalyze={() => {}} />,
-  )
+function renderSummary(data: RaceSummaryData) {
+  return render(<RaceSummary summary={data} />)
 }
 
 describe('RaceSummary ranked rows', () => {
-  it('renders the full telemetry line for a ranked provider', () => {
+  it('renders the compacted telemetry line for a ranked provider', () => {
     renderSummary(
       summary({
         rows: [
@@ -66,8 +52,6 @@ describe('RaceSummary ranked rows', () => {
           }),
         ],
       }),
-      // Two successes surface the analysis section; keep it static here.
-      { phase: 'streaming', text: '' },
     )
     expect(screen.getByText('RESUMO DA CORRIDA')).toBeInTheDocument()
     expect(screen.getByText('telemetria desta execução')).toBeInTheDocument()
@@ -75,14 +59,19 @@ describe('RaceSummary ranked rows', () => {
     expect(screen.getByText('2º')).toBeInTheDocument()
     expect(screen.getByText('1.84s')).toBeInTheDocument()
     expect(screen.getByText('+0.42s')).toBeInTheDocument()
-    expect(screen.getAllByText('0.40s')).toHaveLength(2) // 1º token column
-    expect(screen.getAllByText('128')).toHaveLength(2)
     expect(screen.getAllByText('38.1 tok/s')).toHaveLength(2)
+    // 1º token and tokens moved from grid columns into the mono sub-line.
+    expect(screen.queryByText('1º token')).not.toBeInTheDocument()
+    expect(screen.queryByText('tokens')).not.toBeInTheDocument()
     expect(
-      screen.getByText('gemini-2.5-flash · 42 caracteres'),
+      screen.getByText(
+        'gemini-2.5-flash · 1º token 0.40s · 128 tokens · 42 caracteres',
+      ),
     ).toBeInTheDocument()
     expect(
-      screen.getByText('claude-sonnet-4-5 · 10 caracteres'),
+      screen.getByText(
+        'claude-sonnet-4-5 · 1º token 0.40s · 128 tokens · 10 caracteres',
+      ),
     ).toBeInTheDocument()
   })
 
@@ -104,9 +93,36 @@ describe('RaceSummary ranked rows', () => {
         ],
       }),
     )
-    // rank, latency, Δ, 1º token, tokens, tok/s all fall back to "—".
-    expect(screen.getAllByText('—')).toHaveLength(6)
+    // rank, latency, Δ and tok/s all fall back to "—".
+    expect(screen.getAllByText('—')).toHaveLength(4)
+    // The sub-line drops the counters the row never reported.
     expect(screen.getByText('— · 0 caracteres')).toBeInTheDocument()
+  })
+
+  it('keeps only the counters a row actually reports in its sub-line', () => {
+    renderSummary(
+      summary({
+        rows: [
+          row({ outputTokens: null, tokensPerSecond: null }),
+          row({
+            provider: 'CLAUDE',
+            rank: 2,
+            responseTimeMs: 2260,
+            deltaMs: 420,
+            firstTokenMs: null,
+            tokensPerSecond: null,
+            model: 'claude-sonnet-4-5',
+            chars: 10,
+          }),
+        ],
+      }),
+    )
+    expect(
+      screen.getByText('gemini-2.5-flash · 1º token 0.40s · 42 caracteres'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('claude-sonnet-4-5 · 128 tokens · 10 caracteres'),
+    ).toBeInTheDocument()
   })
 })
 
@@ -213,56 +229,5 @@ describe('RaceSummary without data', () => {
     expect(screen.getByText('sem dados desta execução')).toBeInTheDocument()
     expect(screen.queryByText(/boom/)).not.toBeInTheDocument()
     expect(screen.queryByText('latência')).not.toBeInTheDocument()
-  })
-})
-
-describe('RaceSummary diferenças-chave section (FR-021)', () => {
-  const twoSuccesses = summary({
-    rows: [
-      row({}),
-      row({ provider: 'CLAUDE', rank: 2, responseTimeMs: 2260, deltaMs: 420 }),
-    ],
-  })
-
-  it('hides the section entirely with fewer than two successful lanes', () => {
-    renderSummary(summary({}))
-    expect(screen.queryByText('DIFERENÇAS-CHAVE')).not.toBeInTheDocument()
-  })
-
-  it('does not count faulted lanes as successes', () => {
-    renderSummary(
-      summary({
-        rows: [
-          row({}),
-          row({
-            provider: 'GROK',
-            kind: 'fault',
-            status: 'error',
-            rank: null,
-            errorMessage: 'rate_limited',
-          }),
-        ],
-      }),
-    )
-    expect(screen.queryByText('DIFERENÇAS-CHAVE')).not.toBeInTheDocument()
-  })
-
-  it('shows the judge picker once two lanes succeeded and none is recorded', async () => {
-    renderSummary(twoSuccesses)
-    expect(screen.getByText('DIFERENÇAS-CHAVE')).toBeInTheDocument()
-    // Let the picker's catalog fetch settle inside the test.
-    expect(
-      await screen.findByRole('combobox', { name: 'Juíza' }),
-    ).toBeInTheDocument()
-  })
-
-  it('shows a replayed recorded analysis directly — no judge picker', () => {
-    renderSummary(twoSuccesses, { phase: 'done', analysis: recorded })
-    expect(
-      screen.getByText('juíza: Claude · claude-haiku-4-5'),
-    ).toBeInTheDocument()
-    expect(
-      screen.queryByRole('combobox', { name: 'Juíza' }),
-    ).not.toBeInTheDocument()
   })
 })

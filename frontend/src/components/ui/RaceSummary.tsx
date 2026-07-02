@@ -1,11 +1,10 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import type { AnalysisState, LaneState } from '../../hooks/arenaReducer'
+import type { LaneState } from '../../hooks/arenaReducer'
 import type {
   RaceSummary as RaceSummaryData,
   SummaryRow,
 } from '../../lib/raceSummary'
-import { KeyDifferences, type AnalyzeHandler } from './KeyDifferences'
 import { providerMeta } from '../../lib/providers'
 import { PROVIDER_STYLES } from '../../lib/providerStyles'
 import { laneStatusInfo } from '../../lib/laneStatus'
@@ -16,9 +15,13 @@ import {
 } from '../../lib/format'
 import { cn } from '../../lib/cn'
 
-/** Shared column template: rank · provider · bar · latency · Δ · 1º token · tokens · tok/s. */
+/**
+ * Shared column template: rank · provider · bar · latency · Δ · tok/s.
+ * Compact enough to share the footer row with the analysis panel — the
+ * per-answer counters (1º token, tokens) live in each row's sub-line.
+ */
 const GRID =
-  'grid grid-cols-[2.25rem_6.5rem_minmax(3rem,1fr)_4.5rem_4.5rem_4.5rem_4rem_5.5rem] items-center gap-x-3'
+  'grid grid-cols-[2.25rem_6.5rem_minmax(3rem,1fr)_4.5rem_4.5rem_5.5rem] items-center gap-x-3'
 
 /** Same beat as the lane entrances (`delay: index * 0.06`), a touch slower. */
 const stagger = (index: number) => ({
@@ -26,6 +29,19 @@ const stagger = (index: number) => ({
   animate: { opacity: 1, y: 0 },
   transition: { delay: index * 0.08 },
 })
+
+/**
+ * The row's mono sub-line: model plus the compact per-answer counters —
+ * counters a row never reported are dropped rather than dashed out.
+ */
+function subLine(row: SummaryRow): string {
+  const parts = [row.model ?? '—']
+  if (row.firstTokenMs !== null)
+    parts.push(`1º token ${formatLatency(row.firstTokenMs)}`)
+  if (row.outputTokens !== null) parts.push(`${row.outputTokens} tokens`)
+  parts.push(`${row.chars} caracteres`)
+  return parts.join(' · ')
+}
 
 /** A ranked (or responded-but-untimed) provider's telemetry line. */
 function MetricRow({ row, index }: { row: SummaryRow; index: number }) {
@@ -67,18 +83,12 @@ function MetricRow({ row, index }: { row: SummaryRow; index: number }) {
           {row.deltaMs !== null ? formatDelta(row.deltaMs) : '—'}
         </span>
         <span className="text-mist">
-          {row.firstTokenMs !== null ? formatLatency(row.firstTokenMs) : '—'}
-        </span>
-        <span className="text-mist">{row.outputTokens ?? '—'}</span>
-        <span className="text-mist">
           {row.tokensPerSecond !== null
             ? formatTokensPerSecond(row.tokensPerSecond)
             : '—'}
         </span>
       </div>
-      <p className="pl-[3rem] pt-1 text-[11px] text-mist">
-        {row.model ?? '—'} · {row.chars} caracteres
-      </p>
+      <p className="pl-[3rem] pt-1 text-[11px] text-mist">{subLine(row)}</p>
     </motion.div>
   )
 }
@@ -120,34 +130,19 @@ function StatusRow({ row, index }: { row: SummaryRow; index: number }) {
 const NO_DATA = 'sem dados desta execução'
 
 /**
- * "Resumo da corrida" — the post-race telemetry drawer docked under the lanes
- * (FR-008/FR-019). Slides up once every provider has reported; the lanes'
- * flex-1 grid makes room as it grows. With two or more successful answers it
- * also carries the "DIFERENÇAS-CHAVE" judge-analysis section (FR-021).
+ * "RESUMO DA CORRIDA" — the post-race telemetry panel (FR-008/FR-019), the
+ * left half of the footer row under the lanes (full width when the analysis
+ * panel is hidden). Collapses independently of its "DIFERENÇAS-CHAVE"
+ * sibling; the entrance animation lives on the footer row in the arena.
  */
-export function RaceSummary({
-  summary,
-  analysis,
-  onAnalyze,
-}: {
-  summary: RaceSummaryData
-  analysis: AnalysisState
-  onAnalyze: AnalyzeHandler
-}) {
+export function RaceSummary({ summary }: { summary: RaceSummaryData }) {
   const [expanded, setExpanded] = useState(true)
   const winner = summary.rows.find((row) => row.rank === 1)
-  // The analysis needs ≥2 successful answers to compare (FR-021) — 'done' is
-  // exactly the SUCCESS outcome ('empty' lanes have nothing to compare).
-  const successes = summary.rows.filter((row) => row.status === 'done').length
 
   return (
-    <motion.section
+    <section
       aria-label="Resumo da corrida"
-      initial={{ height: 0, opacity: 0, y: 24 }}
-      animate={{ height: 'auto', opacity: 1, y: 0 }}
-      exit={{ height: 0, opacity: 0, y: 24 }}
-      transition={{ type: 'spring', stiffness: 240, damping: 32 }}
-      className="mx-6 mb-6 shrink-0 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-deck shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04),0_8px_24px_-12px_rgba(0,0,0,0.8)]"
+      className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-deck shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04),0_8px_24px_-12px_rgba(0,0,0,0.8)]"
     >
       <header className="flex items-baseline gap-4 px-5 pb-2 pt-4">
         <h2 className="font-mono text-xs tracking-[0.18em] text-ignition">
@@ -190,8 +185,6 @@ export function RaceSummary({
                 <span />
                 <span>latência</span>
                 <span>Δ líder</span>
-                <span>1º token</span>
-                <span>tokens</span>
                 <span>tok/s</span>
               </div>
               {summary.rows.map((row, index) =>
@@ -205,11 +198,8 @@ export function RaceSummary({
           ) : (
             <p className="py-1 font-mono text-xs text-mist">{NO_DATA}</p>
           )}
-          {successes >= 2 && (
-            <KeyDifferences analysis={analysis} onAnalyze={onAnalyze} />
-          )}
         </div>
       )}
-    </motion.section>
+    </section>
   )
 }

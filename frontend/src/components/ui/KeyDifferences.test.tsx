@@ -26,8 +26,14 @@ const runButton = () =>
   screen.getByRole('button', { name: 'analisar diferenças' })
 
 describe('KeyDifferences judge picker (idle)', () => {
-  it('offers only providers with models, preselects nothing, keeps the run disabled', async () => {
-    render(<KeyDifferences analysis={{ phase: 'idle' }} onAnalyze={vi.fn()} />)
+  it('offers only non-competitors with models, preselects nothing, keeps the run disabled', async () => {
+    render(
+      <KeyDifferences
+        analysis={{ phase: 'idle' }}
+        onAnalyze={vi.fn()}
+        raceProviders={['GEMINI', 'CLAUDE']}
+      />,
+    )
     expect(screen.getByText('DIFERENÇAS-CHAVE')).toBeInTheDocument()
     expect(
       screen.getByText(
@@ -38,22 +44,48 @@ describe('KeyDifferences judge picker (idle)', () => {
 
     const select = await judgeSelect()
     expect(select).toHaveValue('')
-    // GROK has no models in the catalog fixture — it cannot judge (FR-020).
+    // GROK has no models in the catalog fixture (FR-020) and GEMINI/CLAUDE
+    // competed in this run (FR-021) — none of them can judge.
     expect(
       within(select)
         .getAllByRole('option')
         .map((option) => option.textContent),
-    ).toEqual(['selecionar juíza…', 'Gemini', 'ChatGPT', 'Claude', 'DeepSeek'])
+    ).toEqual(['selecionar juíza…', 'ChatGPT', 'DeepSeek'])
     expect(
       screen.queryByRole('combobox', { name: 'Modelo da juíza' }),
     ).not.toBeInTheDocument()
     expect(runButton()).toBeDisabled()
   })
 
+  it('shows a quiet hint instead of the picker when no judge is left outside the race', async () => {
+    render(
+      <KeyDifferences
+        analysis={{ phase: 'idle' }}
+        onAnalyze={vi.fn()}
+        raceProviders={['GEMINI', 'CHATGPT', 'CLAUDE', 'DEEPSEEK']}
+      />,
+    )
+    // GROK is the only non-competitor and has no models — nobody can judge,
+    // but the panel itself still renders.
+    expect(
+      await screen.findByText(
+        'nenhuma juíza disponível fora da corrida — configure outro provedor.',
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('combobox', { name: 'Juíza' }),
+    ).not.toBeInTheDocument()
+    expect(screen.getByText('DIFERENÇAS-CHAVE')).toBeInTheDocument()
+  })
+
   it('enables the run only after provider AND model are picked, then dispatches', async () => {
     const onAnalyze = vi.fn()
     render(
-      <KeyDifferences analysis={{ phase: 'idle' }} onAnalyze={onAnalyze} />,
+      <KeyDifferences
+        analysis={{ phase: 'idle' }}
+        onAnalyze={onAnalyze}
+        raceProviders={['GEMINI']}
+      />,
     )
     await userEvent.selectOptions(await judgeSelect(), 'CLAUDE')
     expect(runButton()).toBeDisabled() // model still unpicked (FR-020)
@@ -69,7 +101,13 @@ describe('KeyDifferences judge picker (idle)', () => {
   })
 
   it('switching the judge provider forgets the previous model pick', async () => {
-    render(<KeyDifferences analysis={{ phase: 'idle' }} onAnalyze={vi.fn()} />)
+    render(
+      <KeyDifferences
+        analysis={{ phase: 'idle' }}
+        onAnalyze={vi.fn()}
+        raceProviders={['DEEPSEEK']}
+      />,
+    )
     const select = await judgeSelect()
     await userEvent.selectOptions(select, 'CLAUDE')
     await userEvent.click(modelCombo())
@@ -90,7 +128,13 @@ describe('KeyDifferences judge picker (idle)', () => {
         return HttpResponse.json({ providers: providerCatalog })
       }),
     )
-    render(<KeyDifferences analysis={{ phase: 'idle' }} onAnalyze={vi.fn()} />)
+    render(
+      <KeyDifferences
+        analysis={{ phase: 'idle' }}
+        onAnalyze={vi.fn()}
+        raceProviders={['GEMINI']}
+      />,
+    )
     expect(
       await screen.findByText(
         'Não foi possível carregar os modelos dos provedores.',
@@ -103,12 +147,40 @@ describe('KeyDifferences judge picker (idle)', () => {
   })
 })
 
+describe('KeyDifferences collapse/expand', () => {
+  it('collapses to a slim header bar and expands back, independently', async () => {
+    render(
+      <KeyDifferences
+        analysis={{ phase: 'idle' }}
+        onAnalyze={vi.fn()}
+        raceProviders={['GEMINI']}
+      />,
+    )
+    await judgeSelect()
+    const toggle = screen.getByRole('button', { name: 'recolher' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+
+    await userEvent.click(toggle)
+    expect(screen.getByText('DIFERENÇAS-CHAVE')).toBeInTheDocument()
+    expect(
+      screen.queryByRole('combobox', { name: 'Juíza' }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText(/análise por IA/)).not.toBeInTheDocument()
+    const expand = screen.getByRole('button', { name: 'expandir' })
+    expect(expand).toHaveAttribute('aria-expanded', 'false')
+
+    await userEvent.click(expand)
+    expect(await judgeSelect()).toBeInTheDocument()
+  })
+})
+
 describe('KeyDifferences streaming', () => {
   it('renders the accumulating markdown with the live caret and no picker', () => {
     const { container } = render(
       <KeyDifferences
         analysis={{ phase: 'streaming', text: '**Modelo A** é mais direto' }}
         onAnalyze={vi.fn()}
+        raceProviders={['GEMINI', 'CLAUDE']}
       />,
     )
     expect(screen.getByText('analisando…')).toBeInTheDocument()
@@ -126,6 +198,7 @@ describe('KeyDifferences done', () => {
       <KeyDifferences
         analysis={{ phase: 'done', analysis: recorded }}
         onAnalyze={vi.fn()}
+        raceProviders={['GEMINI', 'CLAUDE']}
       />,
     )
     expect(
@@ -155,6 +228,7 @@ describe('KeyDifferences error', () => {
       <KeyDifferences
         analysis={{ phase: 'error', message: ANALYSIS_ERROR_MESSAGE }}
         onAnalyze={vi.fn()}
+        raceProviders={['GEMINI', 'CLAUDE']}
       />,
     )
     expect(screen.getByRole('alert')).toHaveTextContent(

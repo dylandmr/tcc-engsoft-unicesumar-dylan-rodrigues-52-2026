@@ -55,13 +55,88 @@ describe('ResultsPage', () => {
     )
   })
 
-  it('surfaces the "Resumo da corrida" drawer once the run completes', async () => {
+  it('surfaces the "Resumo da corrida" panel once the run completes', async () => {
     renderResults({ providers: ['CLAUDE'] })
-    const drawer = await screen.findByRole('region', {
+    const panel = await screen.findByRole('region', {
       name: 'Resumo da corrida',
     })
-    expect(within(drawer).getByText('1º')).toBeInTheDocument()
-    expect(within(drawer).getByText('1.84s')).toBeInTheDocument()
+    expect(within(panel).getByText('1º')).toBeInTheDocument()
+    expect(within(panel).getByText('1.84s')).toBeInTheDocument()
+    // A single success has nothing to compare (FR-021) — no analysis panel,
+    // and the summary takes the footer's full width alone.
+    expect(screen.queryByText('DIFERENÇAS-CHAVE')).not.toBeInTheDocument()
+    expect(panel.parentElement!.className).not.toContain('lg:grid-cols')
+  })
+
+  it('keeps the analysis panel hidden when a fault leaves only one success', async () => {
+    server.use(
+      http.get('/api/comparisons/:id/stream', () =>
+        sseResponse([
+          twoSuccessResults[0],
+          {
+            event: 'result',
+            data: {
+              provider: 'CLAUDE',
+              outcome: 'ERROR',
+              responseText: null,
+              errorMessage: 'rate_limited',
+              responseTimeMs: null,
+            },
+          },
+          { event: 'done', data: { comparisonId: 'c1', completed: 2 } },
+        ]),
+      ),
+    )
+    renderResults({ providers: ['GEMINI', 'CLAUDE'] })
+    await screen.findByRole('region', { name: 'Resumo da corrida' })
+    expect(screen.queryByText('DIFERENÇAS-CHAVE')).not.toBeInTheDocument()
+  })
+
+  it('lays the summary and the analysis side by side, collapsing independently', async () => {
+    server.use(
+      http.get('/api/comparisons/:id/stream', () =>
+        sseResponse([
+          ...twoSuccessResults,
+          { event: 'done', data: { comparisonId: 'c1', completed: 2 } },
+        ]),
+      ),
+    )
+    renderResults({ providers: ['GEMINI', 'CLAUDE'] })
+    const summaryPanel = await screen.findByRole('region', {
+      name: 'Resumo da corrida',
+    })
+    const analysisPanel = screen.getByRole('region', {
+      name: 'Diferenças-chave',
+    })
+    // Two sibling panels in the same footer row, split at lg+.
+    expect(analysisPanel.parentElement).toBe(summaryPanel.parentElement)
+    expect(summaryPanel.parentElement!.className).toContain(
+      'lg:grid-cols-[3fr_2fr]',
+    )
+
+    // Collapsing the summary leaves the analysis panel untouched…
+    await userEvent.click(
+      within(summaryPanel).getByRole('button', { name: 'recolher' }),
+    )
+    expect(within(summaryPanel).queryByText('latência')).not.toBeInTheDocument()
+    expect(
+      await within(analysisPanel).findByRole('combobox', { name: 'Juíza' }),
+    ).toBeInTheDocument()
+
+    // …and collapsing the analysis leaves the (re-expanded) summary untouched.
+    await userEvent.click(
+      within(analysisPanel).getByRole('button', { name: 'recolher' }),
+    )
+    expect(
+      within(analysisPanel).queryByRole('combobox', { name: 'Juíza' }),
+    ).not.toBeInTheDocument()
+    await userEvent.click(
+      within(summaryPanel).getByRole('button', { name: 'expandir' }),
+    )
+    expect(within(summaryPanel).getByText('latência')).toBeInTheDocument()
+    expect(
+      within(analysisPanel).queryByRole('combobox', { name: 'Juíza' }),
+    ).not.toBeInTheDocument()
   })
 
   it('shows the requested model from navigation state while nothing is reported', async () => {
@@ -164,7 +239,7 @@ describe('ResultsPage', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('runs the judge end-to-end from the drawer picker', async () => {
+  it('runs a non-competitor judge end-to-end from the panel picker', async () => {
     server.use(
       http.get('/api/comparisons/:id/stream', () =>
         sseResponse([
@@ -182,16 +257,15 @@ describe('ResultsPage', () => {
     )
     renderResults({ providers: ['GEMINI', 'CLAUDE'] })
     await screen.findByText('DIFERENÇAS-CHAVE')
+    // GEMINI and CLAUDE raced, so the judge must come from outside (FR-021).
     await userEvent.selectOptions(
       await screen.findByRole('combobox', { name: 'Juíza' }),
-      'CLAUDE',
+      'CHATGPT',
     )
     await userEvent.click(
       screen.getByRole('combobox', { name: 'Modelo da juíza' }),
     )
-    await userEvent.click(
-      screen.getByRole('option', { name: 'claude-3-5-haiku-latest' }),
-    )
+    await userEvent.click(screen.getByRole('option', { name: 'gpt-4o-mini' }))
     await userEvent.click(
       screen.getByRole('button', { name: 'analisar diferenças' }),
     )

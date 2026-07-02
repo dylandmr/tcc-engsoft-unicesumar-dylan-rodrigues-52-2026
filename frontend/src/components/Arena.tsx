@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom'
-import { AnimatePresence } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import type { ModelSelection, ProviderId } from '../types'
 import { useArena } from '../hooks/useArena'
 import { buildRaceSummary } from '../lib/raceSummary'
 import { ProviderLane } from './ui/ProviderLane'
 import { RaceSummary } from './ui/RaceSummary'
+import { KeyDifferences } from './ui/KeyDifferences'
 import { Logo } from './ui/Logo'
 import { cn } from '../lib/cn'
 
@@ -19,10 +20,14 @@ interface ArenaProps {
 /** The live results arena: one race-lane per provider, filling independently. */
 export function Arena({ comparisonId, providers, prompt, models }: ArenaProps) {
   const { state, startAnalysis } = useArena(comparisonId, providers)
-  // The winner badge and the post-race drawer are both derived from persisted
+  // The winner badge and the post-race footer are both derived from persisted
   // responseTimeMs — SSE arrival order lies on history replay (results are
   // re-emitted in selection order there).
   const summary = buildRaceSummary(state)
+  // The judge needs ≥2 successful answers to compare (FR-021) — 'done' is
+  // exactly the SUCCESS outcome ('empty' lanes have nothing to compare).
+  const showAnalysis =
+    summary.rows.filter((row) => row.status === 'done').length >= 2
 
   return (
     <div className="flex h-screen flex-col">
@@ -60,13 +65,36 @@ export function Arena({ comparisonId, providers, prompt, models }: ArenaProps) {
         ))}
       </div>
 
+      {/*
+        Post-race footer: two sibling panels — telemetry left (~60% at lg+),
+        judge analysis right (~40%) — stacked below lg, summary first. With
+        fewer than two successes the summary takes the full width alone.
+      */}
       <AnimatePresence>
         {state.done && (
-          <RaceSummary
-            summary={summary}
-            analysis={state.analysis}
-            onAnalyze={startAnalysis}
-          />
+          <motion.footer
+            initial={{ height: 0, opacity: 0, y: 24 }}
+            animate={{ height: 'auto', opacity: 1, y: 0 }}
+            exit={{ height: 0, opacity: 0, y: 24 }}
+            transition={{ type: 'spring', stiffness: 240, damping: 32 }}
+            className="shrink-0 overflow-hidden"
+          >
+            <div
+              className={cn(
+                'mx-6 mb-6 grid items-start gap-4',
+                showAnalysis && 'lg:grid-cols-[3fr_2fr]',
+              )}
+            >
+              <RaceSummary summary={summary} />
+              {showAnalysis && (
+                <KeyDifferences
+                  analysis={state.analysis}
+                  onAnalyze={startAnalysis}
+                  raceProviders={state.order}
+                />
+              )}
+            </div>
+          </motion.footer>
         )}
       </AnimatePresence>
     </div>

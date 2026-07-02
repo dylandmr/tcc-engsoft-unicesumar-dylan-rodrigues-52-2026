@@ -24,7 +24,13 @@ export type AnalyzeHandler = (
  * only while an analysis can be requested, so the catalog fetch is lazy and
  * always fresh on retry.
  */
-function JudgePicker({ onAnalyze }: { onAnalyze: AnalyzeHandler }) {
+function JudgePicker({
+  onAnalyze,
+  raceProviders,
+}: {
+  onAnalyze: AnalyzeHandler
+  raceProviders: ProviderId[]
+}) {
   const [catalog, setCatalog] = useState<ProviderCatalogEntry[]>([])
   const [catalogState, setCatalogState] = useState<
     'loading' | 'ready' | 'error'
@@ -60,8 +66,19 @@ function JudgePicker({ onAnalyze }: { onAnalyze: AnalyzeHandler }) {
       </p>
     )
 
-  // Only a provider whose live catalog offers models can judge (FR-020).
-  const judgeable = catalog.filter((entry) => entry.models.length > 0)
+  // Only a non-competitor whose live catalog offers models can judge —
+  // FR-020 (explicit model pick) plus FR-021 (the backend rejects a
+  // competitor with `judge_in_race`), so competitors never appear as options.
+  const judgeable = catalog.filter(
+    (entry) =>
+      entry.models.length > 0 && !raceProviders.includes(entry.provider),
+  )
+  if (judgeable.length === 0)
+    return (
+      <p className="font-mono text-xs text-mist">
+        nenhuma juíza disponível fora da corrida — configure outro provedor.
+      </p>
+    )
   const chosen = judgeable.find((entry) => entry.provider === judgeProvider)
 
   return (
@@ -141,57 +158,82 @@ function AnalysisReport({ analysis }: { analysis: RecordedAnalysis }) {
 }
 
 /**
- * "DIFERENÇAS-CHAVE" — the on-demand LLM-as-judge analysis section inside the
- * "Resumo da corrida" drawer (FR-021). Renders the judge picker until an
- * analysis exists, live-streams the judge's markdown, then shows the recorded
- * analysis with its anonymization legend. Errors are retryable with any judge.
+ * "DIFERENÇAS-CHAVE" — the on-demand LLM-as-judge analysis panel (FR-021),
+ * the right half of the footer row next to "RESUMO DA CORRIDA". Renders the
+ * judge picker (competitors barred from judging) until an analysis exists,
+ * live-streams the judge's markdown, then shows the recorded analysis with
+ * its anonymization legend. Errors are retryable with any eligible judge.
+ * Collapses independently of its sibling; long analyses scroll internally.
  */
 export function KeyDifferences({
   analysis,
   onAnalyze,
+  raceProviders,
 }: {
   analysis: AnalysisState
   onAnalyze: AnalyzeHandler
+  /** The providers that competed in this run — barred from judging (FR-021). */
+  raceProviders: ProviderId[]
 }) {
+  const [expanded, setExpanded] = useState(true)
   return (
     <section
       aria-label="Diferenças-chave"
-      className="mt-4 border-t border-line/60 pt-3"
+      className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-deck shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04),0_8px_24px_-12px_rgba(0,0,0,0.8)]"
     >
-      <header className="flex items-baseline gap-4 pb-3">
-        <h3 className="font-mono text-xs tracking-[0.18em] text-ignition">
+      <header className="flex items-baseline gap-4 px-5 pb-2 pt-4">
+        <h2 className="font-mono text-xs tracking-[0.18em] text-ignition">
           DIFERENÇAS-CHAVE
-        </h3>
-        <span className="hidden font-mono text-[11px] text-mist sm:inline">
-          análise por IA · respostas anonimizadas e embaralhadas · sem vencedor
-        </span>
+        </h2>
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((open) => !open)}
+          className="ml-auto rounded px-2 py-0.5 font-mono text-xs text-mist transition-colors hover:bg-line/40 hover:text-bright"
+        >
+          {expanded ? 'recolher' : 'expandir'}
+        </button>
       </header>
 
-      {analysis.phase === 'idle' && <JudgePicker onAnalyze={onAnalyze} />}
-
-      {analysis.phase === 'streaming' && (
-        <div>
-          <p className="flex items-center gap-2 pb-2 font-mono text-xs text-ignition">
-            <span className="size-1.5 animate-pulse rounded-full bg-current" />
-            analisando…
+      {expanded && (
+        <div className="max-h-[38vh] overflow-y-auto px-5 pb-4">
+          <p className="pb-3 font-mono text-[11px] text-mist">
+            análise por IA · respostas anonimizadas e embaralhadas · sem
+            vencedor
           </p>
-          {/* `.streaming` glues the blinking caret to the growing markdown. */}
-          <div className="streaming">
-            <Markdown>{analysis.text}</Markdown>
-          </div>
-        </div>
-      )}
 
-      {analysis.phase === 'done' && (
-        <AnalysisReport analysis={analysis.analysis} />
-      )}
+          {analysis.phase === 'idle' && (
+            <JudgePicker onAnalyze={onAnalyze} raceProviders={raceProviders} />
+          )}
 
-      {analysis.phase === 'error' && (
-        <div className="flex flex-col gap-3">
-          <p role="alert" className="font-body text-sm text-error">
-            {analysis.message}
-          </p>
-          <JudgePicker onAnalyze={onAnalyze} />
+          {analysis.phase === 'streaming' && (
+            <div>
+              <p className="flex items-center gap-2 pb-2 font-mono text-xs text-ignition">
+                <span className="size-1.5 animate-pulse rounded-full bg-current" />
+                analisando…
+              </p>
+              {/* `.streaming` glues the blinking caret to the growing markdown. */}
+              <div className="streaming">
+                <Markdown>{analysis.text}</Markdown>
+              </div>
+            </div>
+          )}
+
+          {analysis.phase === 'done' && (
+            <AnalysisReport analysis={analysis.analysis} />
+          )}
+
+          {analysis.phase === 'error' && (
+            <div className="flex flex-col gap-3">
+              <p role="alert" className="font-body text-sm text-error">
+                {analysis.message}
+              </p>
+              <JudgePicker
+                onAnalyze={onAnalyze}
+                raceProviders={raceProviders}
+              />
+            </div>
+          )}
         </div>
       )}
     </section>
