@@ -26,7 +26,8 @@ GOOGLE_API_KEY=...        # Gemini
 XAI_API_KEY=...           # Grok   (OpenAI-compatible, base https://api.x.ai/v1)
 DEEPSEEK_API_KEY=...      # DeepSeek (OpenAI-compatible, base https://api.deepseek.com)
 
-# Per-provider model id (each provider calls exactly one configured model; defaults applied if unset)
+# Per-provider DEFAULT model id (used when the user picks no model in the composer — FR-020;
+# defaults applied if unset). The composer's per-provider model selector can override per run.
 OPENAI_MODEL=...
 ANTHROPIC_MODEL=...
 GOOGLE_MODEL=...
@@ -69,6 +70,11 @@ Each scenario maps to user stories and success criteria in [spec.md](./spec.md).
    providers by response time, with first-token latency, token counts, and model id (FR-008/FR-019).
 5. Try to select a 5th provider → **blocked** with the limit communicated.
 6. Submit with empty prompt or zero providers → **blocked** with a validation message.
+7. **Model selection (FR-020)**: on a selected provider, open its model combo box → **Expect**: a
+   list combining the curated models with the provider's live-reported ones (live only for
+   configured providers; e.g. Gemini with a key shows its full `generateContent` model list). Pick
+   a non-default model (e.g. `gemini-2.5-pro`), run → the lane's telemetry/`model` reflects the
+   chosen model, and reopening from history shows the same requested model.
 
 ### V2 — Isolated failure handling (User Story 2, SC-002)
 

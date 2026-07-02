@@ -52,9 +52,17 @@ A single submitted prompt and the set of providers it targeted (FR-014).
 | status       | enum (Status) | Not null: PENDING (created, not yet run) or COMPLETE (run+persisted) |
 | created_at   | timestamp     | Not null, default now; history is ordered by this descending |
 
+A `Comparison` also carries one **selected model per provider** (element collection
+`comparison_models`: `comparison_id`, `provider`, `model` — FR-020). The model is resolved at
+`POST` time (the user's explicit choice, or the provider's configured default when none was made)
+and is the model the lazy fan-out requests from that provider. Comparisons persisted before model
+selection existed have no rows here; dispatch then falls back to the provider's configured default.
+
 **Rules**:
 - `prompt` MUST be non-empty (FR-006). A maximum length is enforced (see research / quickstart).
 - A `Comparison` MUST reference between 1 and 4 providers via its `ProviderResult` children (FR-005).
+- Each selected provider has at most one entry in `comparison_models`, and its value MUST have been
+  in that provider's offered model set when the comparison was created (FR-020).
 - Only **completed** comparisons are guaranteed to be persisted (spec Assumptions: in-flight on
   logout not guaranteed).
 - A `Comparison` is only ever readable by its owning `user_id` (FR-016).
@@ -141,3 +149,4 @@ COMPLETE  — fan-out finished and ProviderResults persisted
 | History scoped to owning user                     | FR-015, FR-016 |
 | Per-provider response time captured               | Constitution / TCC |
 | Per-provider telemetry (TTFT, token usage, model) captured when reported | FR-019 |
+| Requested model per provider resolved on POST, validated against the offered set, persisted | FR-020 |

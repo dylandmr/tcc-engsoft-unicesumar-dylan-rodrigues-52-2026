@@ -58,6 +58,46 @@ Return the current session's user; used by the SPA to gate protected screens.
 
 ---
 
+## Providers
+
+### GET /api/providers
+
+Describe every supported provider for the composer: whether it is configured (has a server-side
+key), its default model, and the models selectable for it (FR-020). The `models` list is the
+**union** of a curated (predefined) list maintained by the system and the models the provider's own
+API reports as available; the live list is fetched only for configured providers, cached
+server-side for a short TTL, and a fetch failure silently degrades to the curated list (never an
+error — mirrors FR-010's isolation). `models` always contains `defaultModel`. Requires auth.
+
+- **200 OK**
+  ```json
+  {
+    "providers": [
+      {
+        "provider": "GEMINI",
+        "configured": true,
+        "defaultModel": "gemini-2.5-flash",
+        "models": ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"],
+        "source": "live"
+      },
+      {
+        "provider": "CLAUDE",
+        "configured": false,
+        "defaultModel": "claude-3-5-sonnet-latest",
+        "models": ["claude-3-5-haiku-latest", "claude-3-5-sonnet-latest"],
+        "source": "curated"
+      }
+    ]
+  }
+  ```
+  All five providers are always present, in the canonical order {`GEMINI`,`CHATGPT`,`CLAUDE`,
+  `GROK`,`DEEPSEEK`}. `models` is sorted ascending and deduplicated. `source` is `"live"` when the
+  provider's list API contributed entries, `"curated"` otherwise (unconfigured provider or fetch
+  failure).
+- **401 Unauthorized**
+
+---
+
 ## Comparisons
 
 ### POST /api/comparisons
@@ -71,20 +111,25 @@ Request:
 ```json
 {
   "prompt": "Explain quantum entanglement simply.",
-  "providers": ["CLAUDE", "CHATGPT", "GEMINI"]
+  "providers": ["CLAUDE", "CHATGPT", "GEMINI"],
+  "models": { "GEMINI": "gemini-2.5-pro" }
 }
 ```
 
-Validation (FR-005, FR-006):
+Validation (FR-005, FR-006, FR-020):
 - `prompt`: non-empty, length ≤ MAX_PROMPT_LEN (see quickstart).
 - `providers`: 1–4 entries, each from {`GEMINI`,`CHATGPT`,`CLAUDE`,`GROK`,`DEEPSEEK`}, no duplicates.
+- `models` (optional, FR-020): map of provider → model id. Each key MUST be one of the selected
+  `providers`; each value MUST be in that provider's current `models` set from `GET /api/providers`.
+  A provider with no entry runs its `defaultModel`. The resolved model per provider (explicit or
+  default) is persisted with the comparison and used when the lazy fan-out dispatches.
 
 Responses:
 - **201 Created**
   ```json
   { "comparisonId": "c_01H...", "providers": ["CLAUDE", "CHATGPT", "GEMINI"] }
   ```
-- **400 Bad Request** — `{ "error": "empty_prompt" | "no_providers" | "too_many_providers" | "duplicate_provider" | "unknown_provider" | "prompt_too_long" }`
+- **400 Bad Request** — `{ "error": "empty_prompt" | "no_providers" | "too_many_providers" | "duplicate_provider" | "unknown_provider" | "prompt_too_long" | "unknown_model" | "model_for_unselected_provider" }`
 - **401 Unauthorized**
 
 The client then opens the SSE stream below to receive results live.
@@ -186,6 +231,7 @@ Full detail of one past comparison the caller owns, including each provider's re
     "id": "c_01H...",
     "prompt": "Explain quantum entanglement simply.",
     "createdAt": "2026-06-29T18:20:00Z",
+    "models": { "CLAUDE": "claude-3-5-sonnet-latest", "CHATGPT": "gpt-4o-mini", "GEMINI": "gemini-2.5-pro" },
     "results": [
       { "provider": "CLAUDE",  "outcome": "SUCCESS", "responseText": "...", "errorMessage": null, "responseTimeMs": 1840, "firstTokenMs": 320,  "inputTokens": 12,   "outputTokens": 256, "model": "claude-3-5-sonnet-20241022" },
       { "provider": "CHATGPT", "outcome": "SUCCESS", "responseText": "...", "errorMessage": null, "responseTimeMs": 2110, "firstTokenMs": 450,  "inputTokens": 12,   "outputTokens": 301, "model": "gpt-4o-mini-2024-07-18" },
@@ -194,7 +240,11 @@ Full detail of one past comparison the caller owns, including each provider's re
   }
   ```
   Each result row carries the same nullable telemetry fields as the SSE `result` event
-  (`firstTokenMs`, `inputTokens`, `outputTokens`, `model` — FR-019).
+  (`firstTokenMs`, `inputTokens`, `outputTokens`, `model` — FR-019). `models` records the model
+  **requested** per provider when the comparison was created (FR-020) — it may be an empty map for
+  comparisons persisted before model selection existed. The per-result `model` field remains the
+  model the provider **reported** answering (they normally agree, but the reported id can be a more
+  specific dated snapshot, and is null when the provider never answered).
 - **401 Unauthorized**
 - **404 Not Found** — unknown or not owned by caller.
 
@@ -207,7 +257,8 @@ Full detail of one past comparison the caller owns, including each provider's re
 | POST /api/auth/login | FR-002, FR-003 |
 | POST /api/auth/logout | FR-002 |
 | GET /api/auth/me | FR-001 |
-| POST /api/comparisons | FR-004, FR-005, FR-006, FR-007 |
+| GET /api/providers | FR-020 |
+| POST /api/comparisons | FR-004, FR-005, FR-006, FR-007, FR-020 |
 | GET /api/comparisons/{id}/stream | FR-008, FR-009, FR-010, FR-011, FR-012, FR-013, FR-019 |
 | GET /api/comparisons | FR-015, FR-016, FR-017 |
 | GET /api/comparisons/{id} | FR-014, FR-015, FR-016, FR-019 |

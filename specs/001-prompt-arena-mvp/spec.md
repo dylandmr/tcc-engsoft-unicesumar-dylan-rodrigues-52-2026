@@ -36,6 +36,10 @@ its provider responds, independently of the others.
    prompt, **Then** submission is blocked and a clear validation message explains what is required.
 4. **Given** a signed-in user, **When** they attempt to select a fifth provider, **Then** selection
    beyond four is prevented and the limit is communicated.
+5. **Given** a signed-in user who has selected a provider, **When** they open that provider's model
+   selector, **Then** they can choose which of that provider's models answers the comparison from a
+   list combining predefined options with the models the provider's own API reports as available;
+   **and When** they make no choice, **Then** that provider's default model is used.
 
 ---
 
@@ -135,6 +139,9 @@ never appear.
   MUST show an error for that comparison without affecting others.
 - How are concurrent submissions from the same user handled? Behavior MUST be defined so results are
   never mismatched to the wrong prompt.
+- What happens when a provider's model-list API is unreachable or the provider is not configured?
+  The model selector MUST still offer that provider's predefined (curated) models — a live-list
+  failure never blocks composing a comparison (mirrors the per-provider isolation principle).
 
 ## Requirements *(mandatory)*
 
@@ -184,6 +191,14 @@ never appear.
   input and output token counts, and the exact model identifier the provider reports as having
   answered. Each telemetry value is captured when the provider makes it available and recorded as
   absent (null) otherwise — e.g. a timed-out provider has no telemetry.
+- **FR-020**: System MUST let the user choose, per selected provider, which of that provider's
+  models answers the comparison. The choices offered per provider MUST combine a predefined
+  (curated) list maintained by the system with the models that provider's own API reports as
+  available (fetched live when the provider is configured, cached briefly, and falling back to the
+  curated list when the live fetch fails or the provider is unconfigured — the failure never blocks
+  composing). When the user makes no explicit choice, the provider's configured default model MUST
+  be used. The model actually requested per provider MUST be recorded with the comparison, and a
+  submission naming a model outside the offered set MUST be rejected with a validation error.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -193,7 +208,8 @@ never appear.
   ChatGPT, Anthropic Claude, xAI Grok, DeepSeek). Key attributes: identity/label and availability
   for selection. Accessed through a uniform interface.
 - **Comparison**: A single submitted prompt and the set of providers it was sent to. Key attributes:
-  the prompt text, the submitting user, the selected providers, and a timestamp. Has one Provider
+  the prompt text, the submitting user, the selected providers, the model chosen for each selected
+  provider (explicit choice or the provider's default — FR-020), and a timestamp. Has one Provider
   Result per selected provider.
 - **Provider Result**: One provider's outcome for a comparison. Key attributes: which provider, the
   response content (if any), the outcome state (success, empty, error, or timeout), and the recorded
