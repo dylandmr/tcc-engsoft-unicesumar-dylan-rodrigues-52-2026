@@ -52,6 +52,13 @@ A single submitted prompt and the set of providers it targeted (FR-014).
 | status       | enum (Status) | Not null: PENDING (created, not yet run) or COMPLETE (run+persisted) |
 | created_at   | timestamp     | Not null, default now; history is ordered by this descending |
 
+A `Comparison` may also carry one recorded **comparative analysis** (FR-021), generated on demand
+after completion: nullable columns `analysis_text` (the judge's markdown), `analysis_provider` and
+`analysis_model` (the judge identity), plus the element collection `comparison_analysis_order`
+(the randomized provider order backing the "Modelo A/B/…" labels — index 0 = "A"). All are null/
+empty until the user requests an analysis; a judge failure records nothing. Once recorded, the
+analysis is immutable and replayed instead of regenerated.
+
 A `Comparison` also carries one **selected model per provider** (element collection
 `comparison_models`: `comparison_id`, `provider`, `model` — FR-020). The model is the user's
 explicit choice, required for every selected provider and validated at `POST` time against the
@@ -153,3 +160,4 @@ COMPLETE  — fan-out finished and ProviderResults persisted
 | Per-provider response time captured               | Constitution / TCC |
 | Per-provider telemetry (TTFT, token usage, model) captured when reported | FR-019 |
 | Model per provider explicitly chosen on POST, validated against the provider-reported set, persisted | FR-020 |
+| Analysis generated on demand by a user-picked judge, anonymized/shuffled, no winner, persisted once, judge failure taints nothing | FR-021 |

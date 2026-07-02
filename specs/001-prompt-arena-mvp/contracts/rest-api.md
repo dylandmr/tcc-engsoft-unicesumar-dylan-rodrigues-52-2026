@@ -197,6 +197,49 @@ Responses:
 > endpoint is replaced by the `results` array being returned directly from `POST /api/comparisons`
 > once all providers complete. The default contract is the SSE stream.
 
+### GET /api/comparisons/{id}/analysis/stream
+
+Server-Sent Events stream of the comparative "key differences" analysis (FR-021) for a `COMPLETE`
+comparison the caller owns. `Content-Type: text/event-stream`. Requires auth (session cookie; GET,
+so CSRF-exempt like the results stream).
+
+Query parameters (the judge — required on first generation, ignored on replay):
+- `provider` — judge provider, one of {`GEMINI`,`CHATGPT`,`CLAUDE`,`GROK`,`DEEPSEEK`}.
+- `model` — judge model id; MUST be in that provider's current `models` set from
+  `GET /api/providers` (FR-020 semantics — no default judge).
+
+Behavior:
+- **No analysis recorded yet** → validate the judge, compose the judge prompt from the comparison's
+  prompt and its ≥2 `SUCCESS` answers **anonymized as "Modelo A/B/…" in randomized order**, stream
+  the judge's tokens, then persist the analysis (text, judge provider/model, label mapping) on the
+  comparison before the terminal event.
+- **Analysis already recorded** → replay it as a single terminal `analysis` event (no judge call;
+  query parameters ignored).
+- A judge failure is reported on this stream only — the stored comparison results are untouched.
+
+Events:
+- `event: analysis-chunk` — incremental judge text delta: `{ "delta": "..." }` (generation only;
+  replay emits none).
+- `event: analysis` — terminal:
+  ```json
+  {
+    "text": "…markdown…",
+    "errorMessage": null,
+    "provider": "CLAUDE",
+    "model": "claude-haiku-4-5-20251001",
+    "labels": { "A": "GEMINI", "B": "CLAUDE" }
+  }
+  ```
+  On judge failure: `text` null, `errorMessage` set, nothing persisted (the user may retry with any
+  judge).
+- `event: done` — stream closes.
+
+Responses:
+- **200 OK** — `text/event-stream`.
+- **400 Bad Request** — `{ "error": "missing_model" | "unknown_model" | "unknown_provider" | "insufficient_results" | "comparison_not_complete" }`
+  (`insufficient_results`: fewer than two `SUCCESS` answers; judge params invalid per FR-020.)
+- **401 Unauthorized** / **404 Not Found** — as elsewhere.
+
 ### GET /api/comparisons
 
 List the caller's past comparisons, newest first (FR-015, FR-017). Requires auth.
@@ -241,6 +284,19 @@ Full detail of one past comparison the caller owns, including each provider's re
   comparisons persisted before model selection existed. The per-result `model` field remains the
   model the provider **reported** answering (they normally agree, but the reported id can be a more
   specific dated snapshot, and is null when the provider never answered).
+
+  When an analysis has been recorded (FR-021), the detail additionally carries it (otherwise the
+  field is null):
+  ```json
+  "analysis": {
+    "text": "…markdown…",
+    "provider": "CLAUDE",
+    "model": "claude-haiku-4-5-20251001",
+    "labels": { "A": "GEMINI", "B": "CLAUDE" }
+  }
+  ```
+  Replaying a `COMPLETE` comparison's results stream also emits the recorded analysis as an
+  `analysis` event before `done` (additive: clients ignoring unknown events are unaffected).
 - **401 Unauthorized**
 - **404 Not Found** — unknown or not owned by caller.
 
@@ -255,6 +311,7 @@ Full detail of one past comparison the caller owns, including each provider's re
 | GET /api/auth/me | FR-001 |
 | GET /api/providers | FR-020 |
 | POST /api/comparisons | FR-004, FR-005, FR-006, FR-007, FR-020 |
+| GET /api/comparisons/{id}/analysis/stream | FR-021 |
 | GET /api/comparisons/{id}/stream | FR-008, FR-009, FR-010, FR-011, FR-012, FR-013, FR-019 |
 | GET /api/comparisons | FR-015, FR-016, FR-017 |
 | GET /api/comparisons/{id} | FR-014, FR-015, FR-016, FR-019 |

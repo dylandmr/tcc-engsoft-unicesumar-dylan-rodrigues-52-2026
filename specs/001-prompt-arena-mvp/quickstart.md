@@ -72,6 +72,11 @@ Each scenario maps to user stories and success criteria in [spec.md](./spec.md).
    provider, run → the lane and telemetry reflect the chosen models, and reopening from history
    shows the same requested models. Submitting while any selected provider lacks a model is
    **blocked** with a validation message.
+8. **Comparative analysis (FR-021)**: after a run with ≥2 successful answers, the summary footer
+   offers "Diferenças-chave": pick a judge (provider + model, live list) and request the analysis →
+   it streams in as markdown, declares no winner, and shows the "Modelo A/B/…"→provider legend.
+   Reopen the comparison from history → the same analysis appears without a new judge call. With
+   fewer than 2 successful answers the section is absent.
 
 ### V2 — Isolated failure handling (User Story 2, SC-002)
 
